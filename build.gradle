@@ -1,0 +1,33 @@
+plugins {
+    id 'java'
+    id 'java-library'
+    id 'application'
+}
+
+group 'net.orbyfied.hscsms'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+
+    maven {
+        url "https://s01.oss.sonatype.org/content/repositories/releases/"
+    }
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.0'
+
+    // libs
+    api 'it.unimi.dsi:fastutil:8.5.8'
+
+    api 'net.orbyfied.j8:j8-registry:0.1.0'
+    api 'net.orbyfied.j8:j8-util:0.2.0'
+
+    compileOnlyApi 'org.mongodb:mongodb-driver:3.12.11'
+}
+
+test {
+    useJUnitPlatform()
+}
