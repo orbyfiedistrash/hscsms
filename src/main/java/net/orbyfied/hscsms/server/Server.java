@@ -1,6 +1,8 @@
-package net.orbyfied.hscsms;
+package net.orbyfied.hscsms.server;
 
 import net.orbyfied.hscsms.core.ServiceManager;
+import net.orbyfied.hscsms.net.NetworkManager;
+import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.j8.util.logging.Logger;
 
 import java.net.ServerSocket;
@@ -16,8 +18,12 @@ public class Server {
     // the server socket
     ServerSocket socket;
 
+    /* ------ Top-Level Services ------ */
+
     // the service manager
     ServiceManager serviceManager;
+    // the network manager
+    NetworkManager networkManager;
 
     public Server() { }
 
@@ -46,12 +52,22 @@ public class Server {
         return this;
     }
 
+    /* ------ Top-Level Services ------ */
+
     /**
      * Get the core service manager.
      * @return The service manager.
      */
     public ServiceManager services() {
         return serviceManager;
+    }
+
+    /**
+     * Get the core network manager.
+     * @return The network manager.
+     */
+    public NetworkManager networkManager() {
+        return networkManager;
     }
 
 }

@@ -1,4 +1,4 @@
-package net.orbyfied.hscsms;
+package net.orbyfied.hscsms.service;
 
 import net.orbyfied.j8.util.logging.LogHandler;
 import net.orbyfied.j8.util.logging.LogText;

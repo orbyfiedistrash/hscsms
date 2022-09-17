@@ -1,7 +1,7 @@
 package net.orbyfied.hscsms.db;
 
-import net.orbyfied.hscsms.Logging;
-import net.orbyfied.hscsms.Server;
+import net.orbyfied.hscsms.service.Logging;
+import net.orbyfied.hscsms.server.Server;
 import net.orbyfied.j8.registry.Identifier;
 import net.orbyfied.j8.util.logging.Logger;
 
