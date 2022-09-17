@@ -3,7 +3,13 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/hscsms.iml" filepath="$PROJECT_DIR$/.idea/modules/hscsms.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/executable-server/hscsms.executable-server.iml" filepath="$PROJECT_DIR$/.idea/modules/executable-server/hscsms.executable-server.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/executable-server/hscsms.executable-server.main.iml" filepath="$PROJECT_DIR$/.idea/modules/executable-server/hscsms.executable-server.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/executable-server/hscsms.executable-server.test.iml" filepath="$PROJECT_DIR$/.idea/modules/executable-server/hscsms.executable-server.test.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/hscsms.main.iml" filepath="$PROJECT_DIR$/.idea/modules/hscsms.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/server-core/hscsms.server-core.iml" filepath="$PROJECT_DIR$/.idea/modules/server-core/hscsms.server-core.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/server-core/hscsms.server-core.main.iml" filepath="$PROJECT_DIR$/.idea/modules/server-core/hscsms.server-core.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/server-core/hscsms.server-core.test.iml" filepath="$PROJECT_DIR$/.idea/modules/server-core/hscsms.server-core.test.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/hscsms.test.iml" filepath="$PROJECT_DIR$/.idea/modules/hscsms.test.iml" />
     </modules>
   </component>
