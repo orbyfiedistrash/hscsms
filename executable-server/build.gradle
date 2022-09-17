@@ -1,6 +1,8 @@
 plugins {
     id 'java'
-    id 'java-library'
+
+    // for shading in dependencies
+    id "com.github.johnrengelman.shadow" version "7.1.2"
 }
 
 // project properties
@@ -17,6 +19,16 @@ tasks {
         options.release.set(17) }
     processResources {
         filteringCharset = "utf8" }
+    jar {
+        String format = "hscsms-" + project.name + "+" + project.version + ".jar"
+        outputFile = file("../builds/" + format)
+
+        manifest {
+            attributes(
+                    'Main-Class': 'net.orbyfied.hscsms.Main'
+            )
+        }
+    }
 }
 
 /*
