@@ -1,11 +1,11 @@
 package net.orbyfied.hscsms.server;
 
+import net.orbyfied.hscsms.common.protocol.PacketClientboundPublicKey;
 import net.orbyfied.hscsms.net.NetworkHandler;
+import net.orbyfied.hscsms.net.handler.HandlerNode;
 
 import javax.crypto.Cipher;
 import java.net.Socket;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
 
 public class Client {
 
@@ -27,9 +27,6 @@ public class Client {
     // the network handler
     NetworkHandler networkHandler;
 
-    // the top layer RSA encryption keys
-    KeyPair tlKeyPair;
-
     // the user this client has authenticated as
     // this is null at first
     User user;
@@ -41,16 +38,17 @@ public class Client {
     }
 
     public Client readyTopLevelEncryption() {
-        try {
-            // generate keys
-            KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
-            generator.initialize(1024);
-            tlKeyPair = generator.generateKeyPair();
-        } catch (Throwable t) {
-            t.printStackTrace();
-        }
-
         // add handshake handler to client
+        networkHandler.node().childForType(null)
+                .withHandler((handler, node, packet) -> {
+                    // decrypt and store key
+
+                    return new HandlerNode.Result(HandlerNode.Chain.CONTINUE)
+                            .nodeAction(HandlerNode.NodeAction.REMOVE);
+                });
+
+        // send public key
+        networkHandler.sendSync(new PacketClientboundPublicKey(server.topLevelEncryption.getPublicKey()));
 
         // return
         return this;

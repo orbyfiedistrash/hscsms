@@ -4,10 +4,7 @@ import net.orbyfied.hscsms.net.handler.HandlerNode;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.j8.util.logging.Logger;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.*;
 import java.net.Socket;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -20,6 +17,9 @@ public class NetworkHandler {
 
     // the socket
     Socket socket;
+    // the data streams
+    DataInputStream inputStream;
+    DataOutputStream outputStream;
 
     // the handler node
     HandlerNode node = new HandlerNode(null);
@@ -34,10 +34,22 @@ public class NetworkHandler {
 
     /**
      * Get the network handler node.
-     * @return
+     * @return The top node.
      */
     public HandlerNode node() {
         return node;
+    }
+
+    public NetworkHandler fatalClose() {
+        try {
+            if (inputStream != null) inputStream.close();
+            if (outputStream != null) outputStream.close();
+            if (socket != null && !socket.isClosed()) socket.close();
+        } catch (Throwable e) {
+            e.printStackTrace();
+        }
+
+        return this;
     }
 
     public NetworkManager getManager() {
@@ -46,7 +58,36 @@ public class NetworkHandler {
 
     public NetworkHandler connect(Socket socket) {
         this.socket = socket;
+
+        try {
+            inputStream  = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
+            outputStream = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+        } catch (Exception e) {
+            fatalClose();
+            LOGGER.err("Error while connecting");
+            e.printStackTrace();
+        }
+
         return this;
+    }
+
+    public NetworkHandler sendSync(Packet packet) {
+        try {
+            // write packet type
+            outputStream.writeInt(packet.type.id.hashCode());
+
+            // serialize packet
+            packet.type.serializer.serialize(packet.type, packet, outputStream);
+
+            // flush
+            outputStream.flush();
+
+            // return
+            return this;
+        } catch (Throwable t) {
+            t.printStackTrace();
+            return this;
+        }
     }
 
     public NetworkHandler start() {
@@ -80,12 +121,7 @@ public class NetworkHandler {
         @Override
         public void run() {
             try {
-                // get streams
-                DataInputStream inputStream =
-                        new DataInputStream(new BufferedInputStream(socket.getInputStream()));
-                DataOutputStream outputStream =
-                        new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
-
+                // main network loop
                 while (!socket.isClosed() && active.get()) {
                     // listen for incoming packets
                     int packetTypeId = inputStream.readInt();
@@ -106,7 +142,8 @@ public class NetworkHandler {
                 // make sure its set inactive
                 active.set(false);
             } catch (Throwable t) {
-                LOGGER.err(this.getName() + ": Error in worker");
+                fatalClose();
+                LOGGER.err(this.getName() + ": Error in worker network loop");
                 t.printStackTrace();
             }
         }

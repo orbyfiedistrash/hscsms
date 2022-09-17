@@ -2,6 +2,7 @@ package net.orbyfied.hscsms.server;
 
 import net.orbyfied.hscsms.core.ServiceManager;
 import net.orbyfied.hscsms.net.NetworkManager;
+import net.orbyfied.hscsms.security.EncryptionProfile;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.j8.util.logging.Logger;
 
@@ -17,6 +18,12 @@ public class Server {
     SocketAddress address;
     // the server socket
     ServerSocket socket;
+
+    /* ------ Security ----- */
+
+    // the top level encryption
+    public final EncryptionProfile topLevelEncryption
+            = new EncryptionProfile("RSA", "ECB", "PKCS1Padding", 1024);
 
     /* ------ Top-Level Services ------ */
 
@@ -42,9 +49,18 @@ public class Server {
             socket = new ServerSocket();
             socket.bind(address);
 
-            logger.ok("Connected server on " + address);
+            logger.ok("Connected server on {0}", address);
         } catch (Exception e) {
-            logger.err("Failed to connect server on " + address);
+            logger.err("Failed to connect server on {0}", address);
+            e.printStackTrace();
+        }
+
+        // generate top level key pair
+        try {
+            topLevelEncryption.generateKeyPair(1024);
+            logger.ok("Generated top level AES key pair");
+        } catch (Exception e) {
+            logger.err("Failed to generate top level AES key pair");
             e.printStackTrace();
         }
 
