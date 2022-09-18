@@ -21,7 +21,7 @@ tasks {
         filteringCharset = "utf8" }
     jar {
         String format = "hscsms-" + project.name + "+" + project.version + ".jar"
-        outputFile = file("../builds/" + format)
+        outputFile(file("../builds/" + format))
 
         manifest {
             attributes(

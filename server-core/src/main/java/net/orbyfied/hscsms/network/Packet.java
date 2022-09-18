@@ -1,4 +1,4 @@
-package net.orbyfied.hscsms.net;
+package net.orbyfied.hscsms.network;
 
 public abstract class Packet {
 

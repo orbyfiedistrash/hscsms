@@ -1,10 +1,9 @@
 package net.orbyfied.hscsms.server;
 
 import net.orbyfied.hscsms.common.protocol.PacketClientboundPublicKey;
-import net.orbyfied.hscsms.net.NetworkHandler;
-import net.orbyfied.hscsms.net.handler.HandlerNode;
+import net.orbyfied.hscsms.network.NetworkHandler;
+import net.orbyfied.hscsms.network.handler.HandlerNode;
 
-import javax.crypto.Cipher;
 import java.net.Socket;
 
 public class Client {

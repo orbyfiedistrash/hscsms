@@ -1,8 +1,8 @@
-package net.orbyfied.hscsms.net.handler;
+package net.orbyfied.hscsms.network.handler;
 
-import net.orbyfied.hscsms.net.NetworkHandler;
-import net.orbyfied.hscsms.net.Packet;
-import net.orbyfied.hscsms.net.PacketType;
+import net.orbyfied.hscsms.network.NetworkHandler;
+import net.orbyfied.hscsms.network.Packet;
+import net.orbyfied.hscsms.network.PacketType;
 import net.orbyfied.j8.util.functional.TriPredicate;
 
 import java.util.ArrayList;
@@ -107,6 +107,10 @@ public class HandlerNode {
     }
 
     public Result handle(NetworkHandler handler, Packet packet) {
+        // check
+        if (packet == null)
+            return new Result(Chain.HALT);
+
         // temp result
         Result result;
 

@@ -2,7 +2,7 @@ package net.orbyfied.hscsms.server;
 
 import net.orbyfied.hscsms.common.ProtocolSpec;
 import net.orbyfied.hscsms.core.ServiceManager;
-import net.orbyfied.hscsms.net.NetworkManager;
+import net.orbyfied.hscsms.network.NetworkManager;
 import net.orbyfied.hscsms.security.EncryptionProfile;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.j8.util.logging.Logger;
@@ -118,7 +118,7 @@ public class Server {
             try {
                 // accept connection (blocking)
                 Socket clientSocket = socket.accept();
-                logger.info("Client connected: " + clientSocket.getInetAddress());
+                logger.info("Client connected: {0}", clientSocket.getInetAddress().getHostAddress());
 
                 // add client
                 Client client = new Client(this, clientSocket);

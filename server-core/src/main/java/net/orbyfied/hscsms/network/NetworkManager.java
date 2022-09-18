@@ -1,4 +1,4 @@
-package net.orbyfied.hscsms.net;
+package net.orbyfied.hscsms.network;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.orbyfied.hscsms.service.Logging;

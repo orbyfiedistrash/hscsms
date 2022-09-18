@@ -1,6 +1,6 @@
-package net.orbyfied.hscsms.net;
+package net.orbyfied.hscsms.network;
 
-import net.orbyfied.hscsms.net.handler.HandlerNode;
+import net.orbyfied.hscsms.network.handler.HandlerNode;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.j8.util.logging.Logger;
 
@@ -121,6 +121,8 @@ public class NetworkHandler {
         @Override
         public void run() {
             try {
+                long pC = 0; // packet count
+
                 // main network loop
                 while (!socket.isClosed() && active.get()) {
                     // listen for incoming packets
@@ -128,8 +130,12 @@ public class NetworkHandler {
                     // get packet type
                     PacketType<? extends Packet> packetType =
                             manager.getByHash(packetTypeId);
+
                     // handle packet
                     if (packetType != null) {
+                        // increment packet count
+                        pC++;
+
                         // deserialize
                         Packet packet = packetType.deserializer
                                 .deserialize(packetType, inputStream);

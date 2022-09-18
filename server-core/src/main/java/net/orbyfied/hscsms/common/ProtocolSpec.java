@@ -1,7 +1,7 @@
 package net.orbyfied.hscsms.common;
 
 import net.orbyfied.hscsms.common.protocol.PacketClientboundPublicKey;
-import net.orbyfied.hscsms.net.NetworkManager;
+import net.orbyfied.hscsms.network.NetworkManager;
 
 public class ProtocolSpec {
 

@@ -1,4 +1,4 @@
-package net.orbyfied.hscsms.net;
+package net.orbyfied.hscsms.network;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
