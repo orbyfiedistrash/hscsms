@@ -41,7 +41,7 @@ public class MongoDatabaseType extends DatabaseType<MongoDatabase> {
             database.client = mongoClient;
 
             // get database
-            database.db = mongoClient.getDatabase("mc");
+            database.db = mongoClient.getDatabase(ul.getDatabase());
 
             logger.ok("Successfully logged in database '" + database.getName() + "'");
         } catch (Exception e) {
