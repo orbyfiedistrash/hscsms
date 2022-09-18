@@ -2,6 +2,7 @@ package net.orbyfied.hscsms.server;
 
 import net.orbyfied.hscsms.common.protocol.PacketClientboundDisconnect;
 import net.orbyfied.hscsms.common.protocol.PacketClientboundPublicKey;
+import net.orbyfied.hscsms.common.protocol.PacketServerboundDisconnect;
 import net.orbyfied.hscsms.network.handler.ChainAction;
 import net.orbyfied.hscsms.network.handler.HandlerNode;
 import net.orbyfied.hscsms.network.handler.NodeAction;
@@ -19,7 +20,7 @@ public class ServerClient {
         return socket.getInetAddress() + ":" + socket.getPort();
     }
 
-    private static final Logger LOGGER = Logging.getLogger("ServerClient");
+    static final Logger LOGGER = Logging.getLogger("ServerClient");
 
     /////////////////////////////////////////
 
@@ -46,6 +47,7 @@ public class ServerClient {
 
     // disconnect handler
     private void onDisconnect(Throwable t) {
+        // check error
         if (t == null) {
             LOGGER.info("{0} disconnected", this);
         } else {
@@ -107,6 +109,14 @@ public class ServerClient {
     public ServerClient start() {
         // start network handler
         networkHandler.start();
+
+        // add disconnect handler
+        networkHandler.node()
+                .childForType(PacketServerboundDisconnect.TYPE)
+                .withHandler((handler, node, packet) -> {
+                    networkHandler.disconnect();
+                    return new HandlerNode.Result(ChainAction.HALT);
+                });
 
         // return
         return this;

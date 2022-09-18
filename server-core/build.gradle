@@ -50,7 +50,7 @@ dependencies {
     api 'it.unimi.dsi:fastutil:8.5.8'
 
     api 'net.orbyfied.j8:j8-registry:0.1.0'
-    api 'net.orbyfied.j8:j8-util:0.2.1.0'
+    api 'net.orbyfied.j8:j8-util:0.2.1.1_hotfix1'
 
     compileOnlyApi 'org.mongodb:mongodb-driver:3.12.11'
 }

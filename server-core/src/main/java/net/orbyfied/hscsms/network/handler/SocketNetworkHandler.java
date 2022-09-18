@@ -84,6 +84,14 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
         return this;
     }
 
+    public SocketNetworkHandler disconnect() {
+        // deactivate worker
+        stop();
+
+        // return
+        return this;
+    }
+
     public SocketNetworkHandler sendSync(Packet packet) {
         try {
             // write packet type

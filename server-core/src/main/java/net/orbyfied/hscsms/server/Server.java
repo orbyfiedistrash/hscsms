@@ -64,6 +64,9 @@ public class Server {
      * @return This.
      */
     public Server open(SocketAddress address) {
+        // set logger stage
+        logger.stage("Connect");
+
         // set address
         this.address = address;
 
@@ -111,6 +114,9 @@ public class Server {
             e.printStackTrace();
         }
 
+        // reset stage
+        logger.stage(null);
+
         // return
         return this;
     }
@@ -147,7 +153,7 @@ public class Server {
                     clients.add(client);
                     client.start();
 
-                    logger.info("Accepted and started {0}", client);
+                    ServerClient.LOGGER.info("Accepted and started {0}", client);
                 } catch (Exception e) {
                     logger.err("Error while accepting connection from [{0}]",
                             ServerClient.toStringAddress(clientSocket));
