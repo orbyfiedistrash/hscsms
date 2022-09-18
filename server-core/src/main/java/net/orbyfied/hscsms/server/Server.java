@@ -3,6 +3,7 @@ package net.orbyfied.hscsms.server;
 import net.orbyfied.hscsms.common.ProtocolSpec;
 import net.orbyfied.hscsms.core.ServiceManager;
 import net.orbyfied.hscsms.network.NetworkManager;
+import net.orbyfied.hscsms.network.handler.UtilityNetworkHandler;
 import net.orbyfied.hscsms.security.EncryptionProfile;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.j8.util.logging.Logger;
@@ -31,8 +32,15 @@ public class Server {
     // the server socket
     ServerSocket socket;
 
+    // the server utility network handler
+    UtilityNetworkHandler networkHandler;
+
+    public UtilityNetworkHandler utilityNetworkHandler() {
+        return networkHandler;
+    }
+
     // the currently connected clients
-    List<Client> clients = new ArrayList<>();
+    List<ServerClient> clients = new ArrayList<>();
 
     /* ------ Security ----- */
 
@@ -67,6 +75,20 @@ public class Server {
             logger.ok("Connected server on {0}", address);
         } catch (Exception e) {
             logger.err("Failed to connect server on {0}", address);
+            e.printStackTrace();
+        }
+
+        try {
+            // create utility network handler
+            networkHandler = new UtilityNetworkHandler(networkManager, null)
+                    .owned(this);
+
+            // start
+            networkHandler.start();
+
+            logger.ok("Started utility network handler");
+        } catch (Exception e) {
+            logger.err("Failed to start utility network handler");
             e.printStackTrace();
         }
 
@@ -118,12 +140,18 @@ public class Server {
             try {
                 // accept connection (blocking)
                 Socket clientSocket = socket.accept();
-                logger.info("Client connected: {0}", clientSocket.getInetAddress().getHostAddress());
 
                 // add client
-                Client client = new Client(this, clientSocket);
-                clients.add(client);
-                client.start();
+                try {
+                    ServerClient client = new ServerClient(this, clientSocket);
+                    clients.add(client);
+                    client.start();
+
+                    logger.info("Accepted and started {0}", client);
+                } catch (Exception e) {
+                    logger.err("Error while accepting connection from [{0}]",
+                            ServerClient.toStringAddress(clientSocket));
+                }
             } catch (Exception e) {
                 logger.err("Error while accepting connections");
                 e.printStackTrace();

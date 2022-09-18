@@ -4,32 +4,46 @@ import net.orbyfied.hscsms.network.handler.HandlerNode;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.j8.util.logging.Logger;
 
-import java.io.*;
-import java.net.Socket;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class NetworkHandler {
+/**
+ * Generic network handler.
+ * @param <S> Self.
+ */
+@SuppressWarnings({"rawtypes", "unchecked"})
+public abstract class NetworkHandler<S extends NetworkHandler> {
 
-    private static final Logger LOGGER = Logging.getLogger("NetworkHandler");
+    protected static final Logger LOGGER = Logging.getLogger("NetworkHandler");
+
+    /**
+     * The owner of this handler.
+     */
+    protected Object owner;
 
     // the network manager
-    final NetworkManager manager;
-
-    // the socket
-    Socket socket;
-    // the data streams
-    DataInputStream inputStream;
-    DataOutputStream outputStream;
+    protected final NetworkManager manager;
+    // the optional parent
+    protected final NetworkHandler parent;
 
     // the handler node
-    HandlerNode node = new HandlerNode(null);
+    protected HandlerNode node = new HandlerNode(null);
 
     // worker
-    AtomicBoolean active = new AtomicBoolean(true);
-    WorkerThread workerThread = new WorkerThread();
+    protected AtomicBoolean active = new AtomicBoolean(true);
+    protected WorkerThread workerThread;
 
-    public NetworkHandler(final NetworkManager manager) {
+    private final S self;
+
+    public NetworkHandler(final NetworkManager manager,
+                          final NetworkHandler parent) {
         this.manager = manager;
+        this.parent  = parent;
+        this.self    = (S) this;
+    }
+
+    public S owned(Object owner) {
+        this.owner = owner;
+        return self;
     }
 
     /**
@@ -40,78 +54,56 @@ public class NetworkHandler {
         return node;
     }
 
-    public NetworkHandler fatalClose() {
-        try {
-            if (inputStream != null) inputStream.close();
-            if (outputStream != null) outputStream.close();
-            if (socket != null && !socket.isClosed()) socket.close();
-        } catch (Throwable e) {
-            e.printStackTrace();
-        }
-
-        return this;
-    }
-
-    public NetworkManager getManager() {
+    public NetworkManager manager() {
         return manager;
     }
 
-    public NetworkHandler connect(Socket socket) {
-        this.socket = socket;
+    public S start() {
+        // create worker thread
+        if (workerThread == null)
+            workerThread = createWorkerThread();
+        // quit if still null
+        if (workerThread == null)
+            return self;
 
-        try {
-            inputStream  = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
-            outputStream = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
-        } catch (Exception e) {
-            fatalClose();
-            LOGGER.err("Error while connecting");
-            e.printStackTrace();
-        }
-
-        return this;
-    }
-
-    public NetworkHandler sendSync(Packet packet) {
-        try {
-            // write packet type
-            outputStream.writeInt(packet.type.id.hashCode());
-
-            // serialize packet
-            packet.type.serializer.serialize(packet.type, packet, outputStream);
-
-            // flush
-            outputStream.flush();
-
-            // return
-            return this;
-        } catch (Throwable t) {
-            t.printStackTrace();
-            return this;
-        }
-    }
-
-    public NetworkHandler start() {
+        // set active
         active.set(true);
         workerThread.start();
-        return this;
+        return self;
     }
 
-    public NetworkHandler stop() {
+    public S stop() {
         active.set(false);
-        return this;
+        return self;
     }
 
-    public boolean isActive() {
+    public S fatalClose() {
+        // doesnt do anything by default
+        return self;
+    }
+
+    public boolean active() {
         return active.get();
     }
 
-    public Socket getSocket() {
-        return socket;
+    protected abstract WorkerThread createWorkerThread();
+
+    /**
+     * Handles an incoming packet.
+     * @param packet The packet.
+     */
+    protected void handle(Packet packet) {
+        // call parent
+        if (parent != null)
+            parent.handle(packet);
     }
+
+    protected abstract boolean canHandleAsync(Packet packet);
+    protected abstract void scheduleHandleAsync(Packet packet);
 
     /* ---- Worker ---- */
 
-    class WorkerThread extends Thread {
+    public abstract class WorkerThread extends Thread {
         static int id = 0;
 
         public WorkerThread() {
@@ -121,38 +113,22 @@ public class NetworkHandler {
         @Override
         public void run() {
             try {
-                long pC = 0; // packet count
-
-                // main network loop
-                while (!socket.isClosed() && active.get()) {
-                    // listen for incoming packets
-                    int packetTypeId = inputStream.readInt();
-                    // get packet type
-                    PacketType<? extends Packet> packetType =
-                            manager.getByHash(packetTypeId);
-
-                    // handle packet
-                    if (packetType != null) {
-                        // increment packet count
-                        pC++;
-
-                        // deserialize
-                        Packet packet = packetType.deserializer
-                                .deserialize(packetType, inputStream);
-                        // handle
-                        NetworkHandler.this.node()
-                                .handle(NetworkHandler.this, packet);
-                    }
-                }
-
-                // make sure its set inactive
-                active.set(false);
+                runSafe();
             } catch (Throwable t) {
                 fatalClose();
-                LOGGER.err(this.getName() + ": Error in worker network loop");
+                LOGGER.err(this.getName() + ": Error in socket worker network loop");
                 t.printStackTrace();
             }
+
+            // make sure inactive status
+            active.set(false);
         }
+
+        /**
+         * Should run actual code.
+         * Abstracts away the error handling.
+         */
+        public abstract void runSafe() throws Throwable;
     }
 
 }

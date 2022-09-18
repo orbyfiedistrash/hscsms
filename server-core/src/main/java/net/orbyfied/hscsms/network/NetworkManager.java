@@ -28,7 +28,7 @@ public class NetworkManager {
     }
 
     public NetworkManager register(PacketType<? extends Packet> type) {
-        packetTypesById.put(type.getIdentifier().hashCode(), type);
+        packetTypesById.put(type.identifier().hashCode(), type);
         packetTypes.add(type);
         return this;
     }

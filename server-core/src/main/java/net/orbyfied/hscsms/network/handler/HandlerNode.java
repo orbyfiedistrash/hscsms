@@ -10,28 +10,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@SuppressWarnings("rawtypes")
 public class HandlerNode {
-
-    public enum Chain {
-        CONTINUE,
-        HALT
-    }
-
-    public enum NodeAction {
-        REMOVE,
-        KEEP
-    }
 
     public static class Result {
 
-        Chain chain;
+        ChainAction chain;
         NodeAction nodeAction = NodeAction.KEEP;
 
-        public Result(Chain chain) {
+        public Result(ChainAction chain) {
             this.chain = chain;
         }
 
-        public Chain chain() {
+        public ChainAction chain() {
             return chain;
         }
 
@@ -85,7 +76,7 @@ public class HandlerNode {
     public HandlerNode childForType(final PacketType<? extends Packet> type) {
         HandlerNode node = new HandlerNode(this);
         node.directPredicateType = type;
-        node.predicate = (handler, node1, packet) -> packet.getType() == type;
+        node.predicate = (handler, node1, packet) -> packet.type() == type;
         children.add(node);
         childDirectPredicateType.put(type, node);
         return node;
@@ -109,14 +100,14 @@ public class HandlerNode {
     public Result handle(NetworkHandler handler, Packet packet) {
         // check
         if (packet == null)
-            return new Result(Chain.HALT);
+            return new Result(ChainAction.HALT);
 
         // temp result
         Result result;
 
         // call these handlers
         for (Handler<? extends Packet> h : handlers) {
-            if ((result = h.handle(handler, this, packet)).chain() == Chain.HALT)
+            if ((result = h.handle(handler, this, packet)).chain() == ChainAction.HALT)
                 return result;
             if (result.nodeAction() == NodeAction.REMOVE)
                 remove();
@@ -124,20 +115,20 @@ public class HandlerNode {
 
         // try and get fast mapped children
         HandlerNode child;
-        if ((child = childDirectPredicateType.get(packet.getType())) != null) {
-            if ((result = child.handle(handler, packet)).chain() == Chain.HALT)
+        if ((child = childDirectPredicateType.get(packet.type())) != null) {
+            if ((result = child.handle(handler, packet)).chain() == ChainAction.HALT)
                 return result;
         }
 
         // iterate children and call
         for (HandlerNode node : children) {
             if (node.predicate.test(handler, node, packet))
-                if ((result = node.handle(handler, packet)).chain() == Chain.HALT)
+                if ((result = node.handle(handler, packet)).chain() == ChainAction.HALT)
                     return result;
         }
 
         // return
-        return new Result(Chain.CONTINUE);
+        return new Result(ChainAction.CONTINUE);
     }
 
 }

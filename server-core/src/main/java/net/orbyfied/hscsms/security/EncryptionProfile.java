@@ -156,10 +156,25 @@ public class EncryptionProfile {
         return this;
     }
 
-    public String encrypt(String str) {
-        byte[] bytes = str.getBytes(StandardCharsets.UTF_8);
-        bytes = encrypt(bytes);
+    public String toBase64(byte[] bytes) {
         return Base64.getEncoder().encodeToString(bytes);
+    }
+
+    public byte[] fromBase64(String str) {
+        return Base64.getDecoder().decode(str);
+    }
+
+    public String encryptToBase64(String str) {
+        return toBase64(encrypt(str));
+    }
+
+    public String encryptToBase64(byte[] bytes) {
+        return toBase64(encrypt(bytes));
+    }
+
+    public byte[] encrypt(String str) {
+        byte[] bytes = str.getBytes(StandardCharsets.UTF_8);
+        return encrypt(bytes);
     }
 
     public byte[] encrypt(byte[] in) {
@@ -182,18 +197,33 @@ public class EncryptionProfile {
         }
     }
 
-    public String decrypt(String str) {
-        byte[] bytes = Base64.getDecoder().decode(str);
+    public String decryptToUTF8(byte[] bytes) {
         bytes = decrypt(bytes);
         return new String(bytes, StandardCharsets.UTF_8);
+    }
+
+    public byte[] decryptFromBase64(String str) {
+        return decrypt(fromBase64(str));
+    }
+
+    public String decryptFromBase64ToUTF8(String str) {
+        return decryptToUTF8(fromBase64(str));
     }
 
     public String encodePublicKey() {
         return Base64.getEncoder().encodeToString(publicKey.getEncoded());
     }
 
-    public String encodePrivateKey() {
+    public String encodePublicKey(PublicKey publicKey) {
         return Base64.getEncoder().encodeToString(publicKey.getEncoded());
+    }
+
+    public String encodePrivateKey() {
+        return Base64.getEncoder().encodeToString(privateKey.getEncoded());
+    }
+
+    public String encodePrivateKey(PrivateKey privateKey) {
+        return Base64.getEncoder().encodeToString(privateKey.getEncoded());
     }
 
     public EncryptionProfile loadKeys(String priv, String pub) {

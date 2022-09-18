@@ -1,5 +1,6 @@
 package net.orbyfied.hscsms.network;
 
+@SuppressWarnings("rawtypes")
 public abstract class Packet {
 
     // the packet type
@@ -9,7 +10,7 @@ public abstract class Packet {
         this.type = type;
     }
 
-    public PacketType<? extends Packet> getType() {
+    public PacketType type() {
         return type;
     }
 

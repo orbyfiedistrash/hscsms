@@ -5,7 +5,7 @@ import net.orbyfied.j8.registry.Identifier;
 public class PacketType<P extends Packet> {
 
     // the packet class
-    final Class<? extends P> type;
+    final Class<P> type;
 
     // the identifier of this type
     final Identifier id;
@@ -14,19 +14,19 @@ public class PacketType<P extends Packet> {
     Packets.Serializer<P>   serializer;
     Packets.Deserializer<P> deserializer;
 
-    public PacketType(Class<? extends P> type,
+    public PacketType(Class<P> type,
                       Identifier id) {
         this.type = type;
         this.id   = id;
     }
 
-    public PacketType(Class<? extends P> type,
+    public PacketType(Class<P> type,
                       String id) {
         this.type = type;
         this.id   = Identifier.of(id);
     }
 
-    public Identifier getIdentifier() {
+    public Identifier identifier() {
         return id;
     }
 
@@ -34,9 +34,17 @@ public class PacketType<P extends Packet> {
         return type;
     }
 
+    public Packets.Serializer<P> serializer() {
+        return serializer;
+    }
+
     public PacketType<P> serializer(Packets.Serializer<P> serializer) {
         this.serializer = serializer;
         return this;
+    }
+
+    public Packets.Deserializer<P> deserializer() {
+        return deserializer;
     }
 
     public PacketType<P> deserializer(Packets.Deserializer<P> deserializer) {

@@ -5,7 +5,7 @@ import java.util.UUID;
 public class User {
 
     // the client logged into this user
-    Client client;
+    ServerClient client;
 
     // the uuid and username
     final UUID uuid;
@@ -24,7 +24,7 @@ public class User {
         this.pwdHash  = pwdHash;
     }
 
-    public void login(Client client) {
+    public void login(ServerClient client) {
         this.client = client;
     }
 

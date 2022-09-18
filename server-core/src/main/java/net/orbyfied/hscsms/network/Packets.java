@@ -6,7 +6,7 @@ import java.io.DataOutputStream;
 public class Packets {
 
     public interface Serializer<P extends Packet> {
-        void serialize(PacketType type, Packet packet,
+        void serialize(PacketType type, P packet,
                        DataOutputStream stream) throws Throwable;
     }
 
