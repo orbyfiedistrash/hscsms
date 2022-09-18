@@ -31,7 +31,7 @@ public class MongoDatabaseType extends DatabaseType<MongoDatabase> {
 
             // create connection string
             // and client settings
-            ConnectionString connectionString = new ConnectionString("mongodb+srv://serveraccess:3_q7b-XbXFfBPH-@skilesmc.hlayx.mongodb.net/?retryWrites=true&w=majority");
+            ConnectionString connectionString = new ConnectionString(ul.getURI());
             MongoClientSettings settings = MongoClientSettings.builder()
                     .applyConnectionString(connectionString)
                     .build();
