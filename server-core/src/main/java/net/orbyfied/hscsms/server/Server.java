@@ -1,15 +1,16 @@
 package net.orbyfied.hscsms.server;
 
 import net.orbyfied.hscsms.common.ProtocolSpec;
+import net.orbyfied.hscsms.common.protocol.DisconnectReason;
 import net.orbyfied.hscsms.core.ServiceManager;
+import net.orbyfied.hscsms.core.resource.ServerResourceManager;
+import net.orbyfied.hscsms.db.Database;
 import net.orbyfied.hscsms.db.DatabaseManager;
 import net.orbyfied.hscsms.db.Login;
 import net.orbyfied.hscsms.db.impl.MongoDatabase;
 import net.orbyfied.hscsms.network.NetworkManager;
 import net.orbyfied.hscsms.network.handler.UtilityNetworkHandler;
 import net.orbyfied.hscsms.security.EncryptionProfile;
-import net.orbyfied.hscsms.common.protocol.DisconnectReason;
-import net.orbyfied.hscsms.core.resource.ServerResourceManager;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.hscsms.util.SafeWorker;
 import net.orbyfied.hscsms.util.Values;
@@ -147,11 +148,27 @@ public class Server {
 
     public Server setup() {
         // setup databases
-        databaseManager.addDatabase("server", MongoDatabase::new, mongoDatabase -> {
-            mongoDatabase.login(Login.ofURI("mongodb+srv://serveraccess:NCZv0FfT2vEB0da1@cluster0.zhhfy.mongodb.net/?retryWrites=true&w=majority",
-                    "hscsms"));
-        });
+        Database db;
+        Values dbConfig = configuration.get("database", Values.class);
+        String brand    = dbConfig.get("brand", String.class).toLowerCase();
 
+        switch (brand) {
+            // MongoDB
+            case "mongo", "mongodb" -> {
+                db = new MongoDatabase(databaseManager, "server");
+                db.login(Login.ofURI(
+                        dbConfig.get("connection-url"),
+                        dbConfig.get("database-name")
+                ));
+            }
+
+            default -> {
+                logger.err("Unsupported database brand: {0}", brand);
+                return this;
+            }
+        }
+
+        databaseManager.addDatabase(db);
         resourceManager.database(databaseManager.getDatabase("server"));
 
         // setup resource manager

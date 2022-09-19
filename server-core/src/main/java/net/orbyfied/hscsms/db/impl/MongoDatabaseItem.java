@@ -47,8 +47,7 @@ public class MongoDatabaseItem extends DatabaseItem {
     }
 
     public Bson createFilter() {
-        return Filters.and(Projections.excludeId(),
-                Filters.eq(keyName, key));
+        return Filters.eq(keyName, key);
     }
 
     @Override

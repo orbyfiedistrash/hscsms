@@ -1,5 +1,8 @@
 package net.orbyfied.hscsms.util;
 
+import com.sun.jdi.Value;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+
 import java.util.*;
 import java.util.function.Function;
 
@@ -32,27 +35,47 @@ public class Values {
     //////////////////////////////////////
 
     public Values() {
-        map = new HashMap<>();
+        map = new Object2ObjectOpenHashMap<>();
     }
 
     public Values(int size) {
-        map = new HashMap<>(size);
+        map = new Object2ObjectOpenHashMap<>(size);
     }
 
     public Values(Object... objs) {
-        map = new HashMap<>(objs.length);
+        map = new Object2ObjectOpenHashMap<>(objs.length);
         ofVarargs(this, objs);
     }
 
+    public Values(Object2ObjectOpenHashMap<String, Object> map) {
+        this.map = map;
+    }
+
+    public Values(Map<String, Object> map) {
+        this.map = new Object2ObjectOpenHashMap<>();
+        this.map.putAll(map);
+    }
+
     // the internal map
-    HashMap<String, Object> map;
+    Object2ObjectOpenHashMap<String, Object> map;
 
     public int getSize() {
         return map.size();
     }
 
-    public HashMap<String, Object> getMap() {
+    public Object2ObjectOpenHashMap<String, Object> getMap() {
         return map;
+    }
+
+    public Values putAll(Values values) {
+        map.putAll(values.getMap());
+        return this;
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public Values putAll(Map map) {
+        this.map.putAll(map);
+        return this;
     }
 
     public Set<Map.Entry<String, Object>> entrySet() {
@@ -114,8 +137,25 @@ public class Values {
         return (V) indexObject(f, last(path));
     }
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public <V> V get(String key, Class<V> vClass) {
-        return get(key);
+        // split and check key
+        String[] path = key.split("\\.");
+        if (path.length == 0)
+            throw new IllegalArgumentException("invalid key: '" + key + "'");
+        String pl = last(path);
+        // traverse key
+        Object f = traversePath(path);
+        // index object
+        V v = (V) indexObject(f, pl);
+        if (v instanceof Map map && vClass == Values.class) {
+            // wrap map to values object and replace
+            v = (V) new Values(map);
+            assignObject(f, pl, v);
+        }
+
+        // return
+        return v;
     }
 
     @SuppressWarnings("unchecked")

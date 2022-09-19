@@ -1,0 +1,25 @@
+# Configuration Version
+=version: 0
+
+##################
+### Networking
+##################
+
+# The connection port
+port: 42069
+
+##################
+### Database
+##################
+
+# Database configuration
+database:
+
+  # The brand of database
+  brand: "mongodb"
+
+  # The MongoDB connection string
+  connection-url: ""
+
+  # The MongoDB database name
+  database-name: "hscsms"

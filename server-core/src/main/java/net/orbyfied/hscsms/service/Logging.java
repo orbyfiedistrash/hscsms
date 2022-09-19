@@ -6,6 +6,7 @@ import net.orbyfied.j8.util.logging.LogHandler;
 import net.orbyfied.j8.util.logging.LogText;
 import net.orbyfied.j8.util.logging.Logger;
 import net.orbyfied.j8.util.logging.LoggerGroup;
+import net.orbyfied.j8.util.logging.io.LogOutput;
 
 import java.io.*;
 import java.text.DateFormat;
@@ -19,6 +20,19 @@ public class Logging {
 
     public static final PrintStream ERR;
     private static SafeWorker errWorker;
+    public static final LogOutput FORMAT_CONTROLLED_STDOUT = LogOutput.STDOUT; // TODO: maybe later
+
+    private static boolean formatted;
+
+    public static boolean isFormatted() {
+        return formatted;
+    }
+
+    public static void setFormatted(boolean f) {
+        formatted = f;
+        if (FORMAT_CONTROLLED_STDOUT != null)
+            FORMAT_CONTROLLED_STDOUT.setFormatted(f);
+    }
 
     static {
         /*
