@@ -1,10 +1,11 @@
-package net.orbyfied.hscsms.core;
+package net.orbyfied.hscsms.core.resource;
 
 import java.util.UUID;
 
 /**
  * A resource loaded in memory by a server.
  */
+@SuppressWarnings("rawtypes")
 public class ServerResource {
 
     /**
@@ -15,7 +16,7 @@ public class ServerResource {
     /**
      * The resource type.
      */
-    private final int type;
+    private final ServerResourceType type;
 
     /**
      * The local unique identifier, within
@@ -23,7 +24,7 @@ public class ServerResource {
      */
     private final UUID localId;
 
-    public ServerResource(UUID uuid, int type, UUID localId) {
+    public ServerResource(UUID uuid, ServerResourceType type, UUID localId) {
         this.uuid    = uuid;
         this.localId = localId;
         this.type    = type;
@@ -38,20 +39,11 @@ public class ServerResource {
     }
 
     /**
-     * Get the type hash (identifier hash) of this resource.
-     * @return The type identifier hash.
+     * Get the type of this resource.
+     * @return The type.
      */
-    public int getTypeHash() {
+    public ServerResourceType type() {
         return type;
-    }
-
-    /**
-     * Get the type by type hash.
-     * @param manager The manager for indexing the type.
-     * @return The type or null if not found.
-     */
-    public ServerResourceType<?> getType(ServerResourceManager manager) {
-        return manager.getType(type);
     }
 
     /**

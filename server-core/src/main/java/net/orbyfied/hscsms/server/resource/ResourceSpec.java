@@ -1,6 +1,6 @@
 package net.orbyfied.hscsms.server.resource;
 
-import net.orbyfied.hscsms.core.ServerResourceManager;
+import net.orbyfied.hscsms.core.resource.ServerResourceManager;
 
 public class ResourceSpec {
 

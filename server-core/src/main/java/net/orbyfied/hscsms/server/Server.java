@@ -7,7 +7,7 @@ import net.orbyfied.hscsms.network.NetworkManager;
 import net.orbyfied.hscsms.network.handler.UtilityNetworkHandler;
 import net.orbyfied.hscsms.security.EncryptionProfile;
 import net.orbyfied.hscsms.common.protocol.DisconnectReason;
-import net.orbyfied.hscsms.core.ServerResourceManager;
+import net.orbyfied.hscsms.core.resource.ServerResourceManager;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.hscsms.util.SafeWorker;
 import net.orbyfied.j8.util.logging.Logger;
@@ -71,7 +71,7 @@ public class Server {
 
     public Server() { }
 
-    public String getName() {
+    public String name() {
         return name;
     }
 

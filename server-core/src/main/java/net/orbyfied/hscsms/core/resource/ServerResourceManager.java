@@ -1,16 +1,16 @@
-package net.orbyfied.hscsms.core;
+package net.orbyfied.hscsms.core.resource;
 
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import net.orbyfied.hscsms.db.Database;
+import net.orbyfied.hscsms.db.DatabaseItem;
 import net.orbyfied.hscsms.db.DatabaseType;
 import net.orbyfied.hscsms.db.QueryPool;
 import net.orbyfied.hscsms.db.impl.MongoDatabaseItem;
-import net.orbyfied.hscsms.network.NetworkManager;
-import net.orbyfied.hscsms.network.Packet;
-import net.orbyfied.hscsms.network.PacketType;
 import net.orbyfied.hscsms.server.Server;
 import net.orbyfied.hscsms.service.Logging;
+import net.orbyfied.hscsms.util.Values;
 import net.orbyfied.j8.registry.Identifier;
 import net.orbyfied.j8.util.logging.Logger;
 import net.orbyfied.j8.util.reflect.Reflector;
@@ -20,6 +20,8 @@ import org.bson.Document;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 @SuppressWarnings("rawtypes")
 public class ServerResourceManager {
@@ -44,14 +46,25 @@ public class ServerResourceManager {
     // the loaded resources
     private final List<ServerResource> allResources = new ArrayList<>();
 
+    // the database
+    private Database database;
+    // the global query pool
     private final QueryPool globalQueryPool;
-
     // the thread local query pools
     private final ThreadLocal<QueryPool> queryPool = new ThreadLocal<>();
 
     public void setup() {
         // load query pool presets
         loadQueryPoolPresets(globalQueryPool);
+    }
+
+    public ServerResourceManager database(Database database) {
+        this.database = database;
+        return this;
+    }
+
+    public Database database() {
+        return database;
     }
 
     /**
@@ -121,10 +134,108 @@ public class ServerResourceManager {
         }
     }
 
+    /* ---- Functional ---- */
+
+    @SuppressWarnings("unchecked")
+    public <R extends ServerResource> R loadResource(UUID uuid) {
+        // find document
+        DatabaseItem item = findDatabaseResource(uuid);
+
+        // get properties
+        UUID localId  = item.get("localId", UUID.class);
+        int  typeHash = item.get("type", Integer.class);
+
+        // get type
+        ServerResourceType<R> type = getType(typeHash);
+
+        // construct instance
+        R resource = type.newInstance(uuid, localId);
+
+        // load data
+        type.loadResourceSafe(this, item, resource);
+
+        // return
+        return resource;
+    }
+
+    public <R extends ServerResource> R loadResourceLocal(ServerResourceType<R> type,
+                                                          UUID localId) {
+        return type.loadResourceLocal(this, localId);
+    }
+
+    @SuppressWarnings("unchecked")
+    public ServerResourceManager saveResource(ServerResource resource) {
+        // get type
+        ServerResourceType<? extends ServerResource> type = resource.type();
+
+        // call
+        type.saveResource(this, resource);
+
+        // return
+        return this;
+    }
+
+    /**
+     * Loads a resource asynchronously.
+     * @see ServerResourceManager#loadResource(UUID)
+     */
+    public <R extends ServerResource> CompletableFuture<R> loadResourceAsync(final UUID uuid) {
+        return CompletableFuture.supplyAsync(() -> loadResource(uuid));
+    }
+
+    /**
+     * Loads a resource by local ID asynchronously.
+     * @see ServerResourceManager#loadResourceLocal(ServerResourceType, UUID)
+     */
+    public <R extends ServerResource> CompletableFuture<R> loadResourceLocalAsync(final ServerResourceType<R> type,
+                                                                                  final UUID localId) {
+        return CompletableFuture.supplyAsync(() -> loadResourceLocal(type, localId));
+    }
+
+    /**
+     * Saves a resource asynchronously.
+     * @see ServerResourceManager#saveResource(ServerResource)
+     */
+    public CompletableFuture<Void> saveResourceAsync(final ServerResource resource) {
+        return CompletableFuture.runAsync(() -> saveResource(resource));
+    }
+
+    /**
+     * Finds the database item of the resource by UUID.
+     * @param uuid The resource UUID.
+     * @return The item or null if absent.
+     */
+    public DatabaseItem findDatabaseResource(UUID uuid) {
+        QueryPool pool = getLocalQueryPool();
+        return pool.current(database)
+                .querySync("find_resource_uuid", new Values().put("uuid", uuid));
+    }
+
+    /**
+     * Find or create the database item of the resource
+     * by UUID. It will create a new entry if absent.
+     * @param uuid The UUID.
+     * @return Database item.
+     */
+    public DatabaseItem findOrCreateDatabaseResource(UUID uuid) {
+        // try to find document
+        DatabaseItem item = findDatabaseResource(uuid);
+
+        // create if null
+        if (item == null) {
+            QueryPool pool = getLocalQueryPool();
+            item = pool.current(database)
+                    .querySync("create_get_resource_uuid", uuid);
+        }
+
+        // return item
+        return item;
+    }
+
     /* ---- Database ---- */
 
     public String getCollectionName() {
-        return server.getName() + "_resources";
+        return server.name() + "_resources";
     }
 
     private MongoCollection<Document> mongoGetOrCreateResCollection(MongoDatabase mongoDatabase) {
@@ -133,6 +244,7 @@ public class ServerResourceManager {
     }
 
     private void loadQueryPoolPresets(QueryPool pool) {
+
         pool.putQuery("find_resource_uuid", DatabaseType.MONGO_DB, (query, database, values) -> {
             // create filter
             Document filter = new Document();
@@ -164,6 +276,20 @@ public class ServerResourceManager {
                 return null;
             }
         });
+
+        pool.putQuery("create_get_resource_uuid", DatabaseType.MONGO_DB, (query, database, values) -> {
+            // get collection
+            MongoCollection<Document> collection = mongoGetOrCreateResCollection(database.getDatabaseClient());
+
+            // create document
+            Document document = new Document();
+            document.put("uuid", values.get("uuid"));
+            collection.insertOne(document);
+
+            // create database item
+            return new MongoDatabaseItem(database, "uuid", collection, document);
+        });
+
     }
 
 }

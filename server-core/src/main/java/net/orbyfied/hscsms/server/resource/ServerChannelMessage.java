@@ -1,15 +1,14 @@
 package net.orbyfied.hscsms.server.resource;
 
-import net.orbyfied.hscsms.core.ServerResource;
-import net.orbyfied.hscsms.core.ServerResourceManager;
-import net.orbyfied.hscsms.core.ServerResourceType;
-import net.orbyfied.hscsms.db.Database;
+import net.orbyfied.hscsms.core.resource.ServerResource;
+import net.orbyfied.hscsms.core.resource.ServerResourceManager;
+import net.orbyfied.hscsms.core.resource.ServerResourceType;
 import net.orbyfied.hscsms.db.DatabaseItem;
 import net.orbyfied.j8.registry.Identifier;
-import org.bson.Document;
 
 import java.util.UUID;
 
+@SuppressWarnings("rawtypes")
 public class ServerChannelMessage extends ServerResource {
 
     public static final Type TYPE = new Type();
@@ -35,7 +34,7 @@ public class ServerChannelMessage extends ServerResource {
 
     ///////////////////////////////////////////
 
-    public ServerChannelMessage(UUID uuid, int type, UUID localId) {
+    public ServerChannelMessage(UUID uuid, ServerResourceType type, UUID localId) {
         super(uuid, type, localId);
     }
 

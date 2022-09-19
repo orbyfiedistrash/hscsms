@@ -1,4 +1,4 @@
-package net.orbyfied.hscsms.core;
+package net.orbyfied.hscsms.core.resource;
 
 import net.orbyfied.hscsms.db.Database;
 import net.orbyfied.hscsms.db.DatabaseItem;
@@ -7,6 +7,7 @@ import net.orbyfied.hscsms.util.Values;
 import net.orbyfied.j8.registry.Identifier;
 import net.orbyfied.j8.util.logging.Logger;
 
+import java.lang.reflect.Constructor;
 import java.util.UUID;
 
 public abstract class ServerResourceType<R extends ServerResource> {
@@ -19,6 +20,8 @@ public abstract class ServerResourceType<R extends ServerResource> {
 
     // the runtime resource type
     Class<R> resourceClass;
+    // the
+    Constructor<R> constructor;
 
     public ServerResourceType(Identifier id,
                               Class<R> resourceClass) {
@@ -44,6 +47,51 @@ public abstract class ServerResourceType<R extends ServerResource> {
 
     /* -------- Functional --------- */
 
+    public R newInstance(UUID uuid, UUID localId) {
+        try {
+            return constructor.newInstance(uuid, this.getIdentifierHash(), localId);
+        } catch (Exception e) {
+            // rethrow error
+            throw new RuntimeException(e);
+        }
+    }
+
+    public R loadResourceLocal(ServerResourceManager manager,
+                               UUID localId) {
+        // find document
+        DatabaseItem item = findDatabaseResourceLocal(manager, manager.database(), localId);
+
+        // get properties
+        UUID uuid = item.get("uuid", UUID.class);
+
+        // construct instance
+        R resource = newInstance(uuid, localId);
+
+        // load data
+        loadResourceSafe(manager, item, resource);
+
+        // return
+        return resource;
+    }
+
+    @SuppressWarnings("unchecked")
+    public ServerResourceType<R> saveResource(ServerResourceManager manager,
+                                              ServerResource resource) {
+        // find document
+        DatabaseItem item = manager.findOrCreateDatabaseResource(resource.universalID());
+
+        // set properties
+        item.set("uuid",    resource.universalID());
+        item.set("localId", resource.localID());
+        item.set("type",    getIdentifierHash());
+
+        // save data
+        saveResourceSafe(manager, item, (R) resource);
+
+        // return
+        return this;
+    }
+
     public static record ResourceLoadResult(boolean success, Throwable t) {
         public static ResourceLoadResult ofSuccess() {
             return new ResourceLoadResult(true, null);
@@ -58,17 +106,12 @@ public abstract class ServerResourceType<R extends ServerResource> {
 
     /**
      * Finds the database item of the resource by UUID.
-     * @param manager The resource manager.
-     * @param database The database.
+     * @param manager The manager.
      * @param uuid The resource UUID.
      * @return The item or null if absent.
      */
-    public DatabaseItem findDatabaseResource(ServerResourceManager manager,
-                                             Database database,
-                                             UUID uuid) {
-        QueryPool pool = manager.getLocalQueryPool();
-        return pool.current(database)
-                .querySync("find_resource_uuid", new Values().put("uuid", uuid));
+    public DatabaseItem findDatabaseResource(ServerResourceManager manager, UUID uuid) {
+        return manager.findDatabaseResource(uuid);
     }
 
     /**
@@ -83,7 +126,10 @@ public abstract class ServerResourceType<R extends ServerResource> {
                                                   UUID localId) {
         QueryPool pool = manager.getLocalQueryPool();
         return pool.current(database)
-                .querySync("find_resource_local", new Values().put("localId", localId));
+                .querySync("find_resource_local", new Values()
+                        .put("localId", localId)
+                        .put("type", this.getIdentifierHash())
+                );
     }
 
     /**
@@ -133,7 +179,7 @@ public abstract class ServerResourceType<R extends ServerResource> {
             return result;
         } catch (Exception e) {
             logger.err("Error while saving resource " + resource.universalID() + " of type " +
-                    resource.getType(manager).id);
+                    resource.type().id);
             e.printStackTrace();
             return new ResourceSaveResult(false, e);
         }
@@ -156,7 +202,7 @@ public abstract class ServerResourceType<R extends ServerResource> {
             return loadResource(manager, dbItem, resource);
         } catch (Exception e) {
             logger.err("Error while loading resource " + resource.universalID() + " of type " +
-                    resource.getType(manager).id);
+                    resource.type().id);
             e.printStackTrace();
             return new ResourceLoadResult(false, e);
         }
