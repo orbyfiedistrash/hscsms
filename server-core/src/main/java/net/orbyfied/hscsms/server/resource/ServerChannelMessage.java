@@ -22,11 +22,16 @@ public class ServerChannelMessage extends ServerResource {
         @Override
         public ResourceSaveResult saveResource(ServerResourceManager manager, DatabaseItem dbItem, ServerChannelMessage resource) {
             dbItem.set("content_raw", resource.getContentRaw());
+            dbItem.set("channel", manager.saveResourceReference(resource.channel));
             return ResourceSaveResult.ofSuccess();
         }
 
         @Override
         public ResourceLoadResult loadResource(ServerResourceManager manager, DatabaseItem dbItem, ServerChannelMessage resource) {
+            resource.contentRaw = dbItem.get("content_raw", String.class);
+            // force load the channel when
+            // one message inside it is loaded
+            resource.channel = manager.loadResource(dbItem.get("channel", UUID.class));
             return ResourceLoadResult.ofSuccess();
         }
 
@@ -41,6 +46,9 @@ public class ServerChannelMessage extends ServerResource {
     // the raw message content
     String contentRaw;
 
+    // the channel this message is in
+    ServerMessageChannel channel;
+
     public ServerChannelMessage setContentRaw(String contentRaw) {
         this.contentRaw = contentRaw;
         return this;
@@ -48,6 +56,10 @@ public class ServerChannelMessage extends ServerResource {
 
     public String getContentRaw() {
         return contentRaw;
+    }
+
+    public ServerMessageChannel getChannel() {
+        return channel;
     }
 
 }

@@ -70,6 +70,9 @@ public abstract class ServerResourceType<R extends ServerResource> {
         // load data
         loadResourceSafe(manager, item, resource);
 
+        // add loaded
+        manager.addLoaded(resource);
+
         // return
         return resource;
     }

@@ -3,6 +3,7 @@ package net.orbyfied.hscsms.core.resource;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.orbyfied.hscsms.db.Database;
 import net.orbyfied.hscsms.db.DatabaseItem;
 import net.orbyfied.hscsms.db.DatabaseType;
@@ -19,7 +20,6 @@ import org.bson.Document;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -28,6 +28,16 @@ public class ServerResourceManager {
 
     public static final Logger LOGGER = Logging.getLogger("ServerResources");
     private static final Reflector reflector = new Reflector("ServerResources");
+
+    public static UUID getMemoryMapLocalKey(int typeHash, UUID id) {
+        return new UUID(
+                id.getMostSignificantBits() ^ ((long)typeHash * 31L),
+                id.getLeastSignificantBits());
+    }
+
+    public static UUID getMemoryMapLocalKey(ServerResource resource) {
+        return getMemoryMapLocalKey(resource.type().idHash, resource.localID());
+    }
 
     ///////////////////////////////////////////////////////////
 
@@ -44,7 +54,8 @@ public class ServerResourceManager {
     private final ArrayList<ServerResourceType>             types       = new ArrayList<>();
 
     // the loaded resources
-    private final List<ServerResource> allResources = new ArrayList<>();
+    private final Object2ObjectOpenHashMap<UUID, ServerResource> resourcesByLID  = new Object2ObjectOpenHashMap<>();
+    private final Object2ObjectOpenHashMap<UUID, ServerResource> resourcesByUUID = new Object2ObjectOpenHashMap<>();
 
     // the database
     private Database database;
@@ -93,14 +104,12 @@ public class ServerResourceManager {
         return q;
     }
 
-    public ServerResourceManager register(ServerResourceType type) {
+    /* ---- Type ---- */
+
+    public ServerResourceManager registerType(ServerResourceType type) {
         types.add(type);
         typesByHash.put(type.getIdentifierHash(), type);
         return this;
-    }
-
-    public List<ServerResource> getAllResources() {
-        return allResources;
     }
 
     public ArrayList<ServerResourceType> getTypes() {
@@ -124,7 +133,7 @@ public class ServerResourceManager {
             // get and register type
             Field field = reflector.reflectDeclaredField(klass, "TYPE");
             ServerResourceType<?> type = reflector.reflectGetField(field, null);
-            register(type);
+            registerType(type);
 
             // return
             return this;
@@ -134,10 +143,38 @@ public class ServerResourceManager {
         }
     }
 
+    /* ---- Resources ---- */
+
+    public ServerResourceManager addLoaded(ServerResource resource) {
+        resourcesByUUID.put(resource.universalID(), resource);
+        resourcesByLID.put(getMemoryMapLocalKey(resource), resource);
+        return this;
+    }
+
+    public ServerResourceManager removeLoaded(ServerResource resource) {
+        resourcesByUUID.remove(resource.universalID());
+        resourcesByLID.remove(getMemoryMapLocalKey(resource));
+        return this;
+    }
+
+    public ServerResource getLoadedLocal(ServerResourceType type,
+                                   UUID id) {
+        return resourcesByLID.get(getMemoryMapLocalKey(type.idHash, id));
+    }
+
+    public ServerResource getLoadedUniversal(UUID uuid) {
+        return resourcesByUUID.get(uuid);
+    }
+
     /* ---- Functional ---- */
 
     @SuppressWarnings("unchecked")
     public <R extends ServerResource> R loadResource(UUID uuid) {
+        // try and index cache
+        ServerResource res;
+        if ((res = getLoadedUniversal(uuid)) != null)
+            return (R) res;
+
         // find document
         DatabaseItem item = findDatabaseResource(uuid);
 
@@ -154,12 +191,19 @@ public class ServerResourceManager {
         // load data
         type.loadResourceSafe(this, item, resource);
 
+        // add loaded
+        addLoaded(resource);
+
         // return
         return resource;
     }
 
+    @SuppressWarnings("unchecked")
     public <R extends ServerResource> R loadResourceLocal(ServerResourceType<R> type,
                                                           UUID localId) {
+        ServerResource resource;
+        if ((resource = getLoadedLocal(type, localId)) != null)
+            return (R) resource;
         return type.loadResourceLocal(this, localId);
     }
 
@@ -170,6 +214,14 @@ public class ServerResourceManager {
 
         // call
         type.saveResource(this, resource);
+
+        // return
+        return this;
+    }
+
+    public ServerResourceManager unloadResource(ServerResource resource) {
+        // remove resource
+        removeLoaded(resource);
 
         // return
         return this;
@@ -198,6 +250,11 @@ public class ServerResourceManager {
      */
     public CompletableFuture<Void> saveResourceAsync(final ServerResource resource) {
         return CompletableFuture.runAsync(() -> saveResource(resource));
+    }
+
+    public UUID saveResourceReference(final ServerResource resource) {
+        saveResourceAsync(resource);
+        return resource.universalID();
     }
 
     /**
