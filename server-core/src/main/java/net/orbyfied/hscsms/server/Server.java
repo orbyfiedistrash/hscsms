@@ -3,6 +3,8 @@ package net.orbyfied.hscsms.server;
 import net.orbyfied.hscsms.common.ProtocolSpec;
 import net.orbyfied.hscsms.core.ServiceManager;
 import net.orbyfied.hscsms.db.DatabaseManager;
+import net.orbyfied.hscsms.db.Login;
+import net.orbyfied.hscsms.db.impl.MongoDatabase;
 import net.orbyfied.hscsms.network.NetworkManager;
 import net.orbyfied.hscsms.network.handler.UtilityNetworkHandler;
 import net.orbyfied.hscsms.security.EncryptionProfile;
@@ -10,6 +12,7 @@ import net.orbyfied.hscsms.common.protocol.DisconnectReason;
 import net.orbyfied.hscsms.core.resource.ServerResourceManager;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.hscsms.util.SafeWorker;
+import net.orbyfied.hscsms.util.Values;
 import net.orbyfied.j8.util.logging.Logger;
 
 import java.net.ServerSocket;
@@ -31,6 +34,9 @@ public class Server {
 
     // the logger
     Logger logger = Logging.getLogger("Server");
+
+    // top level configuration
+    public final Values configuration = new Values();
 
     /* ------ Networking ------ */
 
@@ -96,7 +102,7 @@ public class Server {
             logger.ok("Connected server on {0}", address);
         } catch (Exception e) {
             logger.err("Failed to connect server on {0}", address);
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
         }
 
         try {
@@ -110,7 +116,7 @@ public class Server {
             logger.ok("Started utility network handler");
         } catch (Exception e) {
             logger.err("Failed to start utility network handler");
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
         }
 
         try {
@@ -120,7 +126,7 @@ public class Server {
             logger.ok("Loaded protocol");
         } catch (Exception e) {
             logger.err("Failed to load protocol");
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
         }
 
         // generate top level key pair
@@ -129,7 +135,7 @@ public class Server {
             logger.ok("Generated top level RSA key pair");
         } catch (Exception e) {
             logger.err("Failed to generate top level RSA key pair");
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
         }
 
         // reset stage
@@ -140,6 +146,14 @@ public class Server {
     }
 
     public Server setup() {
+        // setup databases
+        databaseManager.addDatabase("server", MongoDatabase::new, mongoDatabase -> {
+            mongoDatabase.login(Login.ofURI("mongodb+srv://serveraccess:NCZv0FfT2vEB0da1@cluster0.zhhfy.mongodb.net/?retryWrites=true&w=majority",
+                    "hscsms"));
+        });
+
+        resourceManager.database(databaseManager.getDatabase("server"));
+
         // setup resource manager
         resourceManager.setup();
 
@@ -199,7 +213,7 @@ public class Server {
                 }
             } catch (Exception e) {
                 logger.err("Error while accepting connections");
-                e.printStackTrace();
+                e.printStackTrace(Logging.ERR);
             }
         }
 
@@ -236,7 +250,7 @@ public class Server {
                 logger.info("Closing server socket");
                 socket.close();
             } catch (Exception e) {
-                e.printStackTrace();
+                e.printStackTrace(Logging.ERR);
             }
         }
 

@@ -1,5 +1,6 @@
 package net.orbyfied.hscsms.core.resource;
 
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -52,6 +53,26 @@ public class ServerResource {
      */
     public UUID localID() {
         return localId;
+    }
+
+    /* ---- Object ---- */
+
+    @Override
+    public String toString() {
+        return "ServerResource(" + type.id + ", " + universalID() + ", " + localID() + ")";
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ServerResource resource = (ServerResource) o;
+        return Objects.equals(uuid, resource.uuid);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(uuid);
     }
 
 }

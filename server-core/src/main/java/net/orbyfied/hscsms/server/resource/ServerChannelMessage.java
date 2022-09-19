@@ -20,6 +20,11 @@ public class ServerChannelMessage extends ServerResource {
         }
 
         @Override
+        public UUID createLocalID() {
+            return new UUID(System.currentTimeMillis(), RANDOM.nextLong());
+        }
+
+        @Override
         public ResourceSaveResult saveResource(ServerResourceManager manager, DatabaseItem dbItem, ServerChannelMessage resource) {
             dbItem.set("content_raw", resource.getContentRaw());
             dbItem.set("channel", manager.saveResourceReference(resource.channel));
@@ -31,7 +36,7 @@ public class ServerChannelMessage extends ServerResource {
             resource.contentRaw = dbItem.get("content_raw", String.class);
             // force load the channel when
             // one message inside it is loaded
-            resource.channel = manager.loadResource(dbItem.get("channel", UUID.class));
+            resource.channel = manager.loadResourceReferenceSync(dbItem.get("channel", UUID.class));
             return ResourceLoadResult.ofSuccess();
         }
 
@@ -39,8 +44,8 @@ public class ServerChannelMessage extends ServerResource {
 
     ///////////////////////////////////////////
 
-    public ServerChannelMessage(UUID uuid, ServerResourceType type, UUID localId) {
-        super(uuid, type, localId);
+    public ServerChannelMessage(UUID uuid, UUID localId) {
+        super(uuid, TYPE, localId);
     }
 
     // the raw message content

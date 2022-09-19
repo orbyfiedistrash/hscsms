@@ -18,7 +18,7 @@ import java.util.function.Consumer;
 @SuppressWarnings("rawtypes")
 public class DatabaseManager {
 
-    public static final Logger LOGGER = Logging.getLogger("SkDatabases");
+    public static final Logger LOGGER = Logging.getLogger("Databases");
 
     // databases
     final ArrayList<Database>       db = new ArrayList<>();

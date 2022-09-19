@@ -8,9 +8,12 @@ import net.orbyfied.hscsms.db.Database;
 import net.orbyfied.hscsms.db.DatabaseManager;
 import net.orbyfied.hscsms.db.DatabaseType;
 import net.orbyfied.hscsms.db.Login;
+import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.hscsms.util.Values;
 import net.orbyfied.j8.registry.Identifier;
 import net.orbyfied.j8.util.logging.Logger;
+
+import java.util.logging.Level;
 
 public class MongoDatabaseType extends DatabaseType<MongoDatabase> {
 
@@ -18,6 +21,10 @@ public class MongoDatabaseType extends DatabaseType<MongoDatabase> {
 
     public MongoDatabaseType() {
         super(ID);
+
+        // set mongo logging level
+        java.util.logging.Logger logger = java.util.logging.Logger.getLogger("org.mongodb.driver");
+        logger.setLevel(Level.SEVERE);
     }
 
     @Override
@@ -48,7 +55,7 @@ public class MongoDatabaseType extends DatabaseType<MongoDatabase> {
             logger.ok("Successfully logged in database '" + database.name() + "'");
         } catch (Exception e) {
             logger.err("Error while logging in database '" + database.name() + "'", e);
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
         }
     }
 

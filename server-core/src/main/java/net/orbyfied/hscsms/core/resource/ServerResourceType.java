@@ -3,14 +3,25 @@ package net.orbyfied.hscsms.core.resource;
 import net.orbyfied.hscsms.db.Database;
 import net.orbyfied.hscsms.db.DatabaseItem;
 import net.orbyfied.hscsms.db.QueryPool;
+import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.hscsms.util.Values;
 import net.orbyfied.j8.registry.Identifier;
 import net.orbyfied.j8.util.logging.Logger;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InaccessibleObjectException;
+import java.util.Random;
 import java.util.UUID;
 
 public abstract class ServerResourceType<R extends ServerResource> {
+
+    protected static final Logger LOGGER = Logging.getLogger("ServerResource");
+
+    // a utility random instance for generating IDs
+    protected static final Random RANDOM =
+            new Random(System.currentTimeMillis() ^ System.nanoTime());
+
+    //////////////////////////////////////
 
     // the type identifier
     final Identifier id;
@@ -29,6 +40,23 @@ public abstract class ServerResourceType<R extends ServerResource> {
         this.idHash = id.hashCode();
 
         this.resourceClass = resourceClass;
+
+        // get constructor
+        try {
+            try {
+                this.constructor = resourceClass.getDeclaredConstructor(UUID.class, UUID.class);
+            } catch (NoSuchMethodException e) {
+                this.constructor = resourceClass.getDeclaredConstructor(UUID.class, ServerResourceType.class, UUID.class);
+            }
+        } catch (NoSuchMethodException e) {
+            LOGGER.err("No constructor (UUID, UUID) for resource type " + id + " (" + resourceClass.getName() + ")");
+        } catch (InaccessibleObjectException e) {
+            LOGGER.err("Unable to access constructor (UUID, UUID) for resource type " + id + " (" + resourceClass.getName() + ")");
+            e.printStackTrace(Logging.ERR);
+        } catch (Exception e) {
+            LOGGER.err("Failed to get constructor (UUID, UUID) for resource type " + id + " (" + resourceClass.getName() + ")");
+            e.printStackTrace(Logging.ERR);
+        }
     }
 
     /* Getters */
@@ -47,9 +75,20 @@ public abstract class ServerResourceType<R extends ServerResource> {
 
     /* -------- Functional --------- */
 
-    public R newInstance(UUID uuid, UUID localId) {
+    /**
+     * Creates a new local ID. This ID should have
+     * close to no possibility of colliding with
+     * another ID.
+     * @return The local unique ID.
+     */
+    public abstract UUID createLocalID();
+
+    public R newInstanceInternal(UUID uuid, UUID localId) {
         try {
-            return constructor.newInstance(uuid, this.getIdentifierHash(), localId);
+            if (constructor.getParameterCount() == 2)
+                return constructor.newInstance(uuid, localId);
+            // pass type due to accidental invalid constructor
+            return constructor.newInstance(uuid, this, localId);
         } catch (Exception e) {
             // rethrow error
             throw new RuntimeException(e);
@@ -59,13 +98,13 @@ public abstract class ServerResourceType<R extends ServerResource> {
     public R loadResourceLocal(ServerResourceManager manager,
                                UUID localId) {
         // find document
-        DatabaseItem item = findDatabaseResourceLocal(manager, manager.database(), localId);
+        DatabaseItem item = findDatabaseResourceLocal(manager, manager.requireDatabase(), localId);
 
         // get properties
         UUID uuid = item.get("uuid", UUID.class);
 
         // construct instance
-        R resource = newInstance(uuid, localId);
+        R resource = newInstanceInternal(uuid, localId);
 
         // load data
         loadResourceSafe(manager, item, resource);
@@ -130,8 +169,8 @@ public abstract class ServerResourceType<R extends ServerResource> {
         QueryPool pool = manager.getLocalQueryPool();
         return pool.current(database)
                 .querySync("find_resource_local", new Values()
-                        .put("localId", localId)
-                        .put("type", this.getIdentifierHash())
+                        .setRaw("localId", localId)
+                        .setRaw("typeHash", this.getIdentifierHash())
                 );
     }
 
@@ -183,7 +222,7 @@ public abstract class ServerResourceType<R extends ServerResource> {
         } catch (Exception e) {
             logger.err("Error while saving resource " + resource.universalID() + " of type " +
                     resource.type().id);
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
             return new ResourceSaveResult(false, e);
         }
     }
@@ -206,7 +245,7 @@ public abstract class ServerResourceType<R extends ServerResource> {
         } catch (Exception e) {
             logger.err("Error while loading resource " + resource.universalID() + " of type " +
                     resource.type().id);
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
             return new ResourceLoadResult(false, e);
         }
     }

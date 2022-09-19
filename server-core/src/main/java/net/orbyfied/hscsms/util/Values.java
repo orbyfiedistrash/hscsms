@@ -79,34 +79,134 @@ public class Values {
         return new ArrayList<>(map.values());
     }
 
+    public Values setRaw(String key, Object val) {
+        this.map.put(key, val);
+        return this;
+    }
+
     public Values set(String key, Object val) {
-        map.put(key, val);
+        // split and check key
+        String[] path = key.split("\\.");
+        if (path.length == 0)
+            throw new IllegalArgumentException("invalid key: '" + key + "'");
+        // traverse key
+        Object f = traversePath(path);
+        // assign
+        assignObject(f, last(path), val);
+
+        // return
         return this;
     }
 
     public Values put(String key, Object val) {
-        map.put(key, val);
-        return this;
-    }
-
-    public Values putIfAbsent(String key, Object val) {
-        map.putIfAbsent(key, val);
-        return this;
-    }
-
-    public Values computeIfAbsent(String key, Function<String, Object> function) {
-        map.computeIfAbsent(key, function);
-        return this;
+        return set(key, val);
     }
 
     @SuppressWarnings("unchecked")
     public <V> V get(String key) {
-        return (V) map.get(key);
+        // split and check key
+        String[] path = key.split("\\.");
+        if (path.length == 0)
+            throw new IllegalArgumentException("invalid key: '" + key + "'");
+        // traverse key
+        Object f = traversePath(path);
+        // index object
+        return (V) indexObject(f, last(path));
+    }
+
+    public <V> V get(String key, Class<V> vClass) {
+        return get(key);
     }
 
     @SuppressWarnings("unchecked")
-    public <V> V get(String key, Class<V> vClass) {
+    public <V> V getRaw(String key) {
         return (V) map.get(key);
+    }
+
+    public <V> V getRaw(String key, Class<V> vClass) {
+        return getRaw(key);
+    }
+
+    public boolean contains(String key) {
+        return map.containsKey(key);
+    }
+
+    public boolean containsValue(Object val) {
+        return map.containsValue(val);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <V> V getOrDefault(String key, V def) {
+        // split and check key
+        String[] path = key.split("\\.");
+        if (path.length == 0)
+            throw new IllegalArgumentException("invalid key: '" + key + "'");
+        // traverse key
+        Object f = traversePath(path);
+        // check if key is present
+        // otherwise return default
+        if (!hasObject(f, last(path)))
+            return def;
+        // index object
+        return (V) indexObject(f, last(path));
+    }
+
+    public <V> V getOrDefault(String key, Class<V> vClass, V def) {
+        return getOrDefault(key, def);
+    }
+
+    @SuppressWarnings("rawtypes")
+    boolean hasObject(Object obj, String key) {
+        if (obj instanceof Values v) {
+            return v.contains(key);
+        } else if (obj instanceof Map m) {
+            return m.containsKey(key);
+        }
+
+        throw new IllegalArgumentException("object of type " + (obj == null ? "null" : obj.getClass().getName()) + " is not indexable by string");
+    }
+
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    void assignObject(Object obj, String key, Object val) {
+        if (obj instanceof Values v) {
+            v.setRaw(key, v);
+            return;
+        } else if (obj instanceof Map m) {
+            m.put(key, val);
+            return;
+        }
+
+        throw new IllegalArgumentException("object of type " + (obj == null ? "null" : obj.getClass().getName()) + " is not indexable by string");
+    }
+
+    @SuppressWarnings("rawtypes")
+    Object indexObject(Object obj, String key) {
+        if (obj instanceof Values v) {
+            return v.getRaw(key);
+        } else if (obj instanceof Map m) {
+            return m.get(key);
+        }
+
+        throw new IllegalArgumentException("object of type " + (obj == null ? "null" : obj.getClass().getName()) + " is not indexable by string");
+    }
+
+    Object traversePath(String[] path) {
+        // start at this
+        Object curr = this;
+        // iterative traversal
+        int l = path.length -
+                /* one to last, as last object must be indexed manually */ 1;
+        for (int i = 0; i < l; i++)
+            curr = indexObject(curr, path[i]);
+        // return one to last object
+        return curr;
+    }
+
+    // returns the last item of an array
+    private <V> V last(V[] vs) {
+        if (vs.length == 0)
+            throw new IllegalArgumentException("invalid array of size 0");
+        return vs[vs.length - 1];
     }
 
     /////////////////////////////

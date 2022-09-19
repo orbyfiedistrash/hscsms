@@ -4,6 +4,7 @@ import net.orbyfied.hscsms.network.NetworkHandler;
 import net.orbyfied.hscsms.network.NetworkManager;
 import net.orbyfied.hscsms.network.Packet;
 import net.orbyfied.hscsms.network.PacketType;
+import net.orbyfied.hscsms.service.Logging;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -63,7 +64,7 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
             if (outputStream != null) outputStream.close();
             if (socket != null && !socket.isClosed()) socket.close();
         } catch (Throwable e) {
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
         }
 
         return this;
@@ -78,7 +79,7 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
         } catch (Exception e) {
             fatalClose();
             LOGGER.err("Error while connecting");
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
         }
 
         return this;
@@ -106,7 +107,7 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
             // return
             return this;
         } catch (Throwable t) {
-            t.printStackTrace();
+            t.printStackTrace(Logging.ERR);
             return this;
         }
     }

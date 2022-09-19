@@ -24,4 +24,9 @@ public class MongoDatabase extends Database {
         return db;
     }
 
+    @Override
+    public boolean isOpen() {
+        return db != null;
+    }
+
 }

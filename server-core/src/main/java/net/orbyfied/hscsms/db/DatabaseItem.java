@@ -51,15 +51,17 @@ public abstract class DatabaseItem {
      * like pushing the changes into the database, hence
      * the name. This is not required if the local copy
      * mirrors the database in real time.
+     * @return This or a copy.
      */
-    public abstract void push();
+    public abstract DatabaseItem push();
 
     /**
      * Will update the local copy of the data from the
      * database, pulling the changes from the database.
      * This is not required if the local copy mirrors
      * the database in real time.
+     * @return This or a copy.
      */
-    public abstract void pull();
+    public abstract DatabaseItem pull();
 
 }

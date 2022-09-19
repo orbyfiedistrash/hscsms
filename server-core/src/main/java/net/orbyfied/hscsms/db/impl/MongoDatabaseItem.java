@@ -1,17 +1,25 @@
 package net.orbyfied.hscsms.db.impl;
 
+import com.mongodb.Mongo;
 import com.mongodb.client.MongoCollection;
+import com.mongodb.client.model.*;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.orbyfied.hscsms.db.Database;
 import net.orbyfied.hscsms.db.DatabaseItem;
 import org.bson.BsonInt32;
 import org.bson.Document;
+import org.bson.conversions.Bson;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class MongoDatabaseItem extends DatabaseItem {
 
     /**
-     * The document it will be wrapping.
+     * The primary key value.
      */
-    Document document;
+    Object key;
 
     /**
      * The collection this item is stored in.
@@ -23,31 +31,36 @@ public class MongoDatabaseItem extends DatabaseItem {
      */
     String keyName;
 
+    // the changes to be applied
+    Object2ObjectOpenHashMap<String, Object> changes = new Object2ObjectOpenHashMap<>();
+    // the document as currently stored
+    Document document;
+
     public MongoDatabaseItem(Database database,
                              String keyName,
                              MongoCollection<Document> collection,
-                             Document document) {
+                             Object key) {
         super(database);
         this.keyName    = keyName;
         this.collection = collection;
-        this.document   = document;
+        this.key        = key;
     }
 
-    public Document createFilter() {
-        Document filter = new Document();
-        filter.put(keyName, document.get(keyName));
-        filter.put("_id", new BsonInt32(0)); // exclude _id field
-        return filter;
+    public Bson createFilter() {
+        return Filters.and(Projections.excludeId(),
+                Filters.eq(keyName, key));
     }
 
     @Override
     public Object key() {
-        return document.get(keyName);
+        return key;
     }
 
     @Override
     public void set(String key, Object val) {
-        document.put(key, val);
+        changes.put(key, val);
+        if (document != null)
+            document.put(key, val);
     }
 
     @Override
@@ -56,13 +69,27 @@ public class MongoDatabaseItem extends DatabaseItem {
     }
 
     @Override
-    public void push() {
-        collection.updateOne(createFilter(), document);
+    public MongoDatabaseItem push() {
+        // construct update
+        Bson[] bsons = new Bson[changes.size()];
+        int i = 0;
+        for (Map.Entry<String, Object> entry : changes.entrySet()) {
+            bsons[i] = Updates.set(entry.getKey(), entry.getValue());
+            i++;
+        }
+
+        Bson update = Updates.combine(bsons);
+        changes.clear();
+
+        // execute updates
+        collection.updateOne(createFilter(), update, new UpdateOptions().upsert(true));
+        return this;
     }
 
     @Override
-    public void pull() {
+    public MongoDatabaseItem pull() {
         document = collection.find(createFilter()).first();
+        return this;
     }
 
 }

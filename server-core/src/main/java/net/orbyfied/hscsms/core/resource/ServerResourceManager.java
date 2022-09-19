@@ -2,6 +2,8 @@ package net.orbyfied.hscsms.core.resource;
 
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.orbyfied.hscsms.db.Database;
@@ -20,6 +22,7 @@ import org.bson.Document;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -28,6 +31,12 @@ public class ServerResourceManager {
 
     public static final Logger LOGGER = Logging.getLogger("ServerResources");
     private static final Reflector reflector = new Reflector("ServerResources");
+
+    // a utility random instance for generating IDs
+    protected static final Random RANDOM =
+            new Random(System.currentTimeMillis() * 91 ^ System.nanoTime() << 3);
+
+    public static final UUID NULL_ID = new UUID(0, 0);
 
     public static UUID getMemoryMapLocalKey(int typeHash, UUID id) {
         return new UUID(
@@ -138,7 +147,7 @@ public class ServerResourceManager {
             // return
             return this;
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
             return this;
         }
     }
@@ -168,12 +177,49 @@ public class ServerResourceManager {
 
     /* ---- Functional ---- */
 
+    /**
+     * Creates a new universal unique ID
+     * for a new recourse. This should have
+     * no possibility of colliding with another.
+     * @return The universal unique ID.
+     */
+    public UUID createUniversalID() {
+        return new UUID(
+                System.currentTimeMillis(),
+                System.nanoTime() ^ RANDOM.nextInt()
+        );
+    }
+
+    /**
+     * Creates a new resource of type {@code type}
+     * with a unique universal and local ID, and
+     * registers it to the loaded resources.
+     * @param type The resource type.
+     * @param <R> The resource object class.
+     * @return The resource.
+     */
+    public <R extends ServerResource> R createResource(ServerResourceType<R> type) {
+        // generate ids
+        UUID uuid    = createUniversalID();
+        UUID localId = type.createLocalID();
+
+        // create new resource
+        // and register it
+        R resource = type.newInstanceInternal(uuid, localId);
+        addLoaded(resource);
+
+        // return
+        return resource;
+    }
+
     @SuppressWarnings("unchecked")
     public <R extends ServerResource> R loadResource(UUID uuid) {
         // try and index cache
         ServerResource res;
         if ((res = getLoadedUniversal(uuid)) != null)
             return (R) res;
+
+        // check database open
 
         // find document
         DatabaseItem item = findDatabaseResource(uuid);
@@ -186,7 +232,7 @@ public class ServerResourceManager {
         ServerResourceType<R> type = getType(typeHash);
 
         // construct instance
-        R resource = type.newInstance(uuid, localId);
+        R resource = type.newInstanceInternal(uuid, localId);
 
         // load data
         type.loadResourceSafe(this, item, resource);
@@ -253,8 +299,16 @@ public class ServerResourceManager {
     }
 
     public UUID saveResourceReference(final ServerResource resource) {
+        if (resource == null)
+            return NULL_ID;
         saveResourceAsync(resource);
         return resource.universalID();
+    }
+
+    public <R extends ServerResource> R loadResourceReferenceSync(final UUID uuid) {
+        if (uuid.equals(NULL_ID))
+            return null;
+        return loadResource(uuid);
     }
 
     /**
@@ -264,8 +318,8 @@ public class ServerResourceManager {
      */
     public DatabaseItem findDatabaseResource(UUID uuid) {
         QueryPool pool = getLocalQueryPool();
-        return pool.current(database)
-                .querySync("find_resource_uuid", new Values().put("uuid", uuid));
+        return pool.current(requireDatabase())
+                .querySync("find_resource_uuid", new Values().setRaw("uuid", uuid));
     }
 
     /**
@@ -281,8 +335,8 @@ public class ServerResourceManager {
         // create if null
         if (item == null) {
             QueryPool pool = getLocalQueryPool();
-            item = pool.current(database)
-                    .querySync("create_get_resource_uuid", uuid);
+            item = pool.current(requireDatabase())
+                    .querySync("create_get_resource_uuid", new Values().setRaw("uuid", uuid));
         }
 
         // return item
@@ -290,6 +344,24 @@ public class ServerResourceManager {
     }
 
     /* ---- Database ---- */
+
+    public boolean isDatabaseOpen() {
+        return database != null && database.isOpen();
+    }
+
+    @SuppressWarnings("unchecked")
+    public <D extends Database> D requireDatabase() {
+        if (!isDatabaseOpen())
+            throw new IllegalStateException("resource database isn't opened");
+        return (D) database;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <D extends Database> D requireDatabase(Class<D> dClass) {
+        if (!isDatabaseOpen())
+            throw new IllegalStateException("resource database isn't opened");
+        return (D) database;
+    }
 
     public String getCollectionName() {
         return server.name() + "_resources";
@@ -303,32 +375,31 @@ public class ServerResourceManager {
     private void loadQueryPoolPresets(QueryPool pool) {
 
         pool.putQuery("find_resource_uuid", DatabaseType.MONGO_DB, (query, database, values) -> {
-            // create filter
-            Document filter = new Document();
-            filter.put("_id", new BsonInt32(0)); // ignore _id field
-            filter.put("uuid", values.get("uuid"));
-
             // get collection
             MongoCollection<Document> collection = mongoGetOrCreateResCollection(database.getDatabaseClient());
-            Document doc = collection.find(filter).first();
+            UUID uuid = values.get("uuid");
+            Document doc = collection.find(
+                    Filters.and(Projections.excludeId(),
+                            Filters.eq("uuid", values.get("uuid")))
+            ).projection(Projections.excludeId()).first();
             if (doc != null) {
-                return new MongoDatabaseItem(database, "uuid", collection, doc);
+                return new MongoDatabaseItem(database, "uuid", collection, uuid)
+                        .pull();
             } else {
                 return null;
             }
         });
 
         pool.putQuery("find_resource_local", DatabaseType.MONGO_DB, (query, database, values) -> {
-            // create filter
-            Document filter = new Document();
-            filter.put("_id", new BsonInt32(0)); // ignore _id field
-            filter.put("localId", values.get("localId"));
-
             // get collection
             MongoCollection<Document> collection = mongoGetOrCreateResCollection(database.getDatabaseClient());
-            Document doc = collection.find(filter).first();
+            Document doc = collection.find(
+                    Filters.and(Filters.eq("localId", values.get("localId")),
+                            Filters.eq("type", values.get("typeHash")))
+            ).projection(Projections.excludeId()).first();
             if (doc != null) {
-                return new MongoDatabaseItem(database, "uuid", collection, doc);
+                return new MongoDatabaseItem(database, "uuid", collection, doc.get("uuid", UUID.class))
+                        .pull();
             } else {
                 return null;
             }
@@ -340,11 +411,13 @@ public class ServerResourceManager {
 
             // create document
             Document document = new Document();
-            document.put("uuid", values.get("uuid"));
+            UUID uuid = values.getRaw("uuid");
+            document.put("uuid", uuid);
             collection.insertOne(document);
 
             // create database item
-            return new MongoDatabaseItem(database, "uuid", collection, document);
+            return new MongoDatabaseItem(database, "uuid", collection, uuid)
+                    .pull();
         });
 
     }

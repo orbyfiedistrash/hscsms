@@ -117,7 +117,7 @@ public abstract class NetworkHandler<S extends NetworkHandler> {
             } catch (Throwable t) {
                 fatalClose();
                 LOGGER.err(this.getName() + ": Error in socket worker network loop");
-                t.printStackTrace();
+                t.printStackTrace(Logging.ERR);
             }
 
             // make sure inactive status

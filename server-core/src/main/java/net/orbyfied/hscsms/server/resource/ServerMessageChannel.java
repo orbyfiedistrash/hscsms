@@ -6,6 +6,7 @@ import net.orbyfied.hscsms.core.resource.ServerResourceType;
 import net.orbyfied.hscsms.db.DatabaseItem;
 import net.orbyfied.j8.registry.Identifier;
 
+import java.util.Random;
 import java.util.UUID;
 
 public class ServerMessageChannel extends ServerResource {
@@ -19,13 +20,18 @@ public class ServerMessageChannel extends ServerResource {
         }
 
         @Override
+        public UUID createLocalID() {
+            return new UUID(System.currentTimeMillis(), RANDOM.nextLong());
+        }
+
+        @Override
         public ResourceSaveResult saveResource(ServerResourceManager manager, DatabaseItem dbItem, ServerMessageChannel resource) {
-            return null;
+            return ResourceSaveResult.ofSuccess();
         }
 
         @Override
         public ResourceLoadResult loadResource(ServerResourceManager manager, DatabaseItem dbItem, ServerMessageChannel resource) {
-            return null;
+            return ResourceLoadResult.ofSuccess();
         }
     }
 

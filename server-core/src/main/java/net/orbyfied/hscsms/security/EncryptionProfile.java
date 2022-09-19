@@ -1,5 +1,7 @@
 package net.orbyfied.hscsms.security;
 
+import net.orbyfied.hscsms.service.Logging;
+
 import javax.crypto.Cipher;
 import javax.crypto.NoSuchPaddingException;
 import java.nio.charset.StandardCharsets;
@@ -15,10 +17,10 @@ public class EncryptionProfile {
             return Cipher.getInstance(str);
         } catch (NoSuchAlgorithmException e) {
             System.err.println("Unknown cipher (algorithm): " + str);
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
         } catch (NoSuchPaddingException e) {
             System.err.println("Unknown cipher (padding): " + str);
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
         }
 
         return null;
@@ -31,7 +33,7 @@ public class EncryptionProfile {
             return KeyFactory.getInstance(str);
         } catch (NoSuchAlgorithmException e) {
             System.err.println("Unknown key factory (algorithm): " + str);
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
         }
 
         return null;
@@ -42,7 +44,7 @@ public class EncryptionProfile {
             return KeyPairGenerator.getInstance(str);
         } catch (NoSuchAlgorithmException e) {
             System.err.println("Unknown key pair gen (algorithm): " + str);
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
         }
 
         return null;
@@ -99,7 +101,7 @@ public class EncryptionProfile {
             this.privateKey = pair.getPrivate();
             return this;
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
             return this;
         }
     }
@@ -182,7 +184,7 @@ public class EncryptionProfile {
             cipher.init(Cipher.ENCRYPT_MODE, publicKey);
             return cipher.doFinal(in);
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
             return null;
         }
     }
@@ -192,7 +194,7 @@ public class EncryptionProfile {
             cipher.init(Cipher.DECRYPT_MODE, publicKey);
             return cipher.doFinal(in);
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
             return null;
         }
     }
@@ -242,7 +244,7 @@ public class EncryptionProfile {
             X509EncodedKeySpec publicSpec = new X509EncodedKeySpec(Base64.getDecoder().decode(str));
             publicKey = keyFactory.generatePublic(publicSpec);
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
         }
         return this;
     }
@@ -252,7 +254,7 @@ public class EncryptionProfile {
             PKCS8EncodedKeySpec privateSpec = new PKCS8EncodedKeySpec(Base64.getDecoder().decode(str));
             return keyFactory.generatePrivate(privateSpec);
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
             return null;
         }
     }
@@ -262,7 +264,7 @@ public class EncryptionProfile {
             X509EncodedKeySpec publicSpec = new X509EncodedKeySpec(Base64.getDecoder().decode(str));
             return keyFactory.generatePublic(publicSpec);
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
             return null;
         }
     }

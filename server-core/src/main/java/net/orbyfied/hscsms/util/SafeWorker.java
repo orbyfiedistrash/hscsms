@@ -1,5 +1,6 @@
 package net.orbyfied.hscsms.util;
 
+import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.j8.util.functional.ThrowableRunnable;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -85,6 +86,11 @@ public class SafeWorker extends Thread {
         super.start();
     }
 
+    public synchronized SafeWorker commence() {
+        start();
+        return this;
+    }
+
     public void terminate() {
         active.set(false);
         try {
@@ -96,7 +102,7 @@ public class SafeWorker extends Thread {
         try {
             join();
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
         }
     }
 
@@ -110,7 +116,7 @@ public class SafeWorker extends Thread {
                 errorHandler.accept(this, t);
             } else {
                 System.err.println("Error in worker thread " + getName());
-                t.printStackTrace();
+                t.printStackTrace(Logging.ERR);
             }
         }
 

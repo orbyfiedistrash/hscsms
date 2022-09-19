@@ -1,6 +1,7 @@
 package net.orbyfied.hscsms.util;
 
 import net.orbyfied.hscsms.network.Packet;
+import net.orbyfied.hscsms.service.Logging;
 
 import java.util.function.Consumer;
 
@@ -88,7 +89,7 @@ public class LoopWorker extends SafeWorker {
         try {
             sleep(ms);
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
         }
     }
 

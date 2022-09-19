@@ -36,7 +36,10 @@ public class QueryPool {
 
     public QueryPool current(Database database) {
         this.database    = database;
-        this.currentType = database.type;
+        if (database != null)
+            this.currentType = database.type;
+        else
+            this.currentType = null;
         // define env
         return this;
     }

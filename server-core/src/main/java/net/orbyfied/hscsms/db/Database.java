@@ -25,6 +25,8 @@ public abstract class Database {
         this.universalQueryPool = queryPool();
     }
 
+    public abstract boolean isOpen();
+
     public DatabaseType type() {
         return type;
     }

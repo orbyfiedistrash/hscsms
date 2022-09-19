@@ -1,10 +1,13 @@
 package net.orbyfied.hscsms.service;
 
+import net.orbyfied.hscsms.util.LoopWorker;
+import net.orbyfied.hscsms.util.SafeWorker;
 import net.orbyfied.j8.util.logging.LogHandler;
 import net.orbyfied.j8.util.logging.LogText;
 import net.orbyfied.j8.util.logging.Logger;
 import net.orbyfied.j8.util.logging.LoggerGroup;
 
+import java.io.*;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -14,7 +17,35 @@ public class Logging {
     // the main logger group
     private static final LoggerGroup GROUP = new LoggerGroup("HSCSMS");
 
+    public static final PrintStream ERR;
+    private static SafeWorker errWorker;
+
     static {
+        /*
+         * Bulk Error Stream
+         */
+
+        ByteArrayOutputStream baos  = new ByteArrayOutputStream();
+        BufferedOutputStream stream = new BufferedOutputStream(baos);
+
+        ERR = new PrintStream(stream, false) {
+            @Override
+            public synchronized void flush() {
+                try {
+                    stream.flush();
+                    System.err.write(baos.toByteArray());
+                    baos.reset();
+                } catch (IOException e) {
+                    e.printStackTrace(Logging.ERR);
+                }
+            }
+        };
+
+        errWorker = new LoopWorker("ErrorStreamWorker", dt -> {
+            // flushes the error stream 20 times per second
+            ERR.flush();
+        }).setTargetUps(20f).commence();
+
         /*
          * Time appending.
          */

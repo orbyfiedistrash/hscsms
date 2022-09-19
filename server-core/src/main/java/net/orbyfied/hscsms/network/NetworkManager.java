@@ -55,7 +55,7 @@ public class NetworkManager {
             // return
             return this;
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(Logging.ERR);
             return this;
         }
     }
