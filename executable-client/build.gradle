@@ -25,11 +25,10 @@ tasks {
 
         manifest {
             attributes(
-                    'Main-Class': 'net.orbyfied.hscsms.ServerMain'
+                    'Main-Class': 'net.orbyfied.hscsms.ClientMain'
             )
         }
     }
-
 }
 
 /*

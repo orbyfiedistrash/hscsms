@@ -1,6 +1,6 @@
 package net.orbyfied.hscsms.db;
 
-@SuppressWarnings("unchecked")
+@SuppressWarnings({"unchecked", "rawtypes"})
 public abstract class Database {
 
     // the database name
@@ -10,7 +10,10 @@ public abstract class Database {
     protected final DatabaseManager manager;
 
     // the database type
-    protected final DatabaseType    type;
+    protected final DatabaseType type;
+
+    // the universal query pool
+    public final QueryPool universalQueryPool;
 
     public Database(DatabaseManager manager,
                     String name,
@@ -18,17 +21,19 @@ public abstract class Database {
         this.manager = manager;
         this.name    = name;
         this.type    = type;
+
+        this.universalQueryPool = queryPool();
     }
 
-    public DatabaseType getType() {
+    public DatabaseType type() {
         return type;
     }
 
-    public DatabaseManager getManager() {
+    public DatabaseManager manager() {
         return manager;
     }
 
-    public String getName() {
+    public String name() {
         return name;
     }
 
@@ -41,7 +46,7 @@ public abstract class Database {
     }
 
     public QueryPool queryPool() {
-        return new QueryPool(this, type);
+        return new QueryPool(null).current(this);
     }
 
 }

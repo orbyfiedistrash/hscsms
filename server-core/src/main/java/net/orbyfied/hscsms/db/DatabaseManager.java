@@ -76,7 +76,7 @@ public class DatabaseManager {
     }
 
     public QueryPool queryPool() {
-        return new QueryPool(null, null);
+        return new QueryPool(null);
     }
 
 }

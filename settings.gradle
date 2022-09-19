@@ -1,4 +1,5 @@
 rootProject.name = 'hscsms'
 include 'server-core'
 include 'executable-server'
+include 'executable-client'
 

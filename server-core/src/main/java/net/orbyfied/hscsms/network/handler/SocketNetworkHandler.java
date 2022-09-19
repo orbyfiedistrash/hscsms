@@ -111,6 +111,12 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
         }
     }
 
+    public boolean isOpen() {
+        if (socket == null)
+            return false;
+        return !socket.isClosed();
+    }
+
     @Override
     protected NetworkHandler.WorkerThread createWorkerThread() {
         return new SocketWorkerThread();

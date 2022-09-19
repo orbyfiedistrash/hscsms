@@ -2,10 +2,14 @@ package net.orbyfied.hscsms.server;
 
 import net.orbyfied.hscsms.common.ProtocolSpec;
 import net.orbyfied.hscsms.core.ServiceManager;
+import net.orbyfied.hscsms.db.DatabaseManager;
 import net.orbyfied.hscsms.network.NetworkManager;
 import net.orbyfied.hscsms.network.handler.UtilityNetworkHandler;
 import net.orbyfied.hscsms.security.EncryptionProfile;
+import net.orbyfied.hscsms.common.protocol.DisconnectReason;
+import net.orbyfied.hscsms.core.ServerResourceManager;
 import net.orbyfied.hscsms.service.Logging;
+import net.orbyfied.hscsms.util.SafeWorker;
 import net.orbyfied.j8.util.logging.Logger;
 
 import java.net.ServerSocket;
@@ -18,6 +22,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class Server {
 
     /* ------ Core ------ */
+
+    // the server name
+    final String name = "hscsms";
 
     // if the server should be running
     AtomicBoolean active = new AtomicBoolean(false);
@@ -34,6 +41,9 @@ public class Server {
 
     // the server utility network handler
     UtilityNetworkHandler networkHandler;
+    // server socket worker
+    public final SafeWorker serverSocketWorker = new SafeWorker("ServerSocketWorker")
+            .withActivityPredicate(safeWorker -> active.get());
 
     public UtilityNetworkHandler utilityNetworkHandler() {
         return networkHandler;
@@ -54,8 +64,16 @@ public class Server {
     ServiceManager serviceManager = new ServiceManager();
     // the network manager
     NetworkManager networkManager = new NetworkManager();
+    // the database manager
+    DatabaseManager databaseManager = new DatabaseManager(this);
+    // the resource manager
+    ServerResourceManager resourceManager = new ServerResourceManager(this);
 
     public Server() { }
+
+    public String getName() {
+        return name;
+    }
 
     /**
      * Bind and open the server on the provided
@@ -121,6 +139,24 @@ public class Server {
         return this;
     }
 
+    public Server setup() {
+        // setup resource manager
+        resourceManager.setup();
+
+        // return
+        return this;
+    }
+
+    public Server start() {
+        // start socket worker
+        serverSocketWorker
+                .withTarget(this::runMain)
+                .start();
+
+        // return
+        return this;
+    }
+
     public Server setActive(boolean b) {
         active.set(b);
         return this;
@@ -133,7 +169,10 @@ public class Server {
     /**
      * The main server network loop.
      */
-    public void runMain() {
+    private void runMain() {
+        // thread local stage
+        logger.stage("Socket");
+
         // while running
         while (active.get()) {
             // check if the socket is still open
@@ -164,12 +203,45 @@ public class Server {
             }
         }
 
-        // close logger group
-        Logging.getGroup().setActive(false);
+        // shutdown
+        logger.info("Server closed, shutting down");
+        shutdownProcess();
+    }
+
+    public void shutdown() {
+        // terminate workers
+        serverSocketWorker.terminate();
+
+        // set inactive
+        active.set(false);
+
+        // call shutdown process
+        shutdownProcess();
     }
 
     private void shutdownProcess() {
+        logger.stage("Shutdown");
         logger.info("Shutting down...");
+
+        // disconnect all clients
+        logger.info("Disconnecting clients");
+        for (ServerClient client : clients) {
+            client.disconnect(DisconnectReason.CLOSE);
+            client.stop();
+        }
+
+        // close server socket
+        if (!socket.isClosed()) {
+            try {
+                logger.info("Closing server socket");
+                socket.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        // close logger group
+        Logging.getGroup().setActive(false);
     }
 
     /* ------ Top-Level Services ------ */
@@ -188,6 +260,22 @@ public class Server {
      */
     public NetworkManager networkManager() {
         return networkManager;
+    }
+
+    /**
+     * Get the core server resource manager.
+     * @return The resource manager.
+     */
+    public ServerResourceManager resourceManager() {
+        return resourceManager;
+    }
+
+    /**
+     * Get the core database manager.
+     * @return The database manager.
+     */
+    public DatabaseManager databaseManager() {
+        return databaseManager;
     }
 
 }

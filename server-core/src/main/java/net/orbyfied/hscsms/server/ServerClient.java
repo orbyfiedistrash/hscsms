@@ -7,7 +7,7 @@ import net.orbyfied.hscsms.network.handler.ChainAction;
 import net.orbyfied.hscsms.network.handler.HandlerNode;
 import net.orbyfied.hscsms.network.handler.NodeAction;
 import net.orbyfied.hscsms.network.handler.SocketNetworkHandler;
-import net.orbyfied.hscsms.server.client.DisconnectReason;
+import net.orbyfied.hscsms.common.protocol.DisconnectReason;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.j8.util.logging.Logger;
 import net.orbyfied.j8.util.logging.formatting.TextFormat;
@@ -34,6 +34,9 @@ public class ServerClient {
     // this is null at first
     User user;
 
+    // last disconnect reason
+    private DisconnectReason lastDisconnectReason;
+
     public ServerClient(Server server, Socket socket) {
         this.server = server;
         networkHandler = new SocketNetworkHandler(
@@ -49,7 +52,9 @@ public class ServerClient {
     private void onDisconnect(Throwable t) {
         // check error
         if (t == null) {
-            LOGGER.info("{0} disconnected", this);
+            if (lastDisconnectReason != DisconnectReason.CLOSE) {
+                LOGGER.info("{0} disconnected", this);
+            }
         } else {
             LOGGER.err("{0} disconnected with error", this);
             LOGGER.err(TextFormat.RED_FG + t.toString());
@@ -89,6 +94,9 @@ public class ServerClient {
                 } catch (Exception e) {
                     LOGGER.err("Error while disconnecting {0}: Send disconnect packet", this);
                 }
+
+                // store reason
+                this.lastDisconnectReason = reason;
 
                 // disconnect socket
                 networkHandler.getSocket().close();

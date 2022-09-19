@@ -4,7 +4,7 @@ import net.orbyfied.hscsms.server.Server;
 
 import java.net.InetSocketAddress;
 
-public class Main {
+public class ServerMain {
 
     // server instance
     public static Server server;
@@ -19,7 +19,11 @@ public class Main {
         // run server on main thread
         server
                 .setActive(true)
-                .runMain();
+                .setup()
+                .start();
+
+        // await a worker to block until the server stops
+        server.serverSocketWorker.await();
     }
 
 }

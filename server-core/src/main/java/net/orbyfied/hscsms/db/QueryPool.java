@@ -15,11 +15,12 @@ public class QueryPool {
 
     ///////////////////////////////////
 
-    QueryPool(Database database,
-              DatabaseType<Database> type) {
-        this.database    = database;
-        this.currentType = type;
+    QueryPool(QueryPool parent) {
+        this.parent = parent;
     }
+
+    // environment
+    Values env = new Values();
 
     // the queries stored
     Int2ObjectOpenHashMap<DatabaseQuery<Object, Database>> queries = new Int2ObjectOpenHashMap<>();
@@ -30,19 +31,40 @@ public class QueryPool {
     // the current database type
     DatabaseType<Database> currentType;
 
-    public QueryPool currentDatabase(Database database) {
+    // the parent query pool
+    QueryPool parent;
+
+    public QueryPool current(Database database) {
         this.database    = database;
         this.currentType = database.type;
+        // define env
         return this;
+    }
+
+    public QueryPool fork() {
+        return new QueryPool(this).current(this.database);
+    }
+
+    public <R, D extends Database> DatabaseQuery<R, D> getQuery(int h) {
+        DatabaseQuery<R, D> query;
+        // search local
+        if ((query = (DatabaseQuery<R, D>) queries.get(h)) != null)
+            return query;
+        // search parent
+        if (parent != null)
+            return parent.getQuery(h);
+        // return absent
+        return null;
     }
 
     public <R, D extends Database> DatabaseQuery<R, D> getQuery(String op,
                                                                 DatabaseType<D> type) {
-        return (DatabaseQuery<R, D>) queries.get(getHash(op, type));
+        int h = getHash(op, type);
+        return getQuery(h);
     }
 
     public <R, D extends Database> DatabaseQuery<R, D> getQuery(String op) {
-        return (DatabaseQuery<R, D>) queries.get(getHash(op, currentType));
+        return (DatabaseQuery<R, D>) getQuery(op, currentType);
     }
 
 
@@ -51,7 +73,8 @@ public class QueryPool {
         return this;
     }
 
-    public <R, D extends Database> QueryPool putQuery(String op, DatabaseType<D> type, TriFunction<DatabaseQuery<R, D>, D, Values, R> func) {
+    public <R, D extends Database> QueryPool putQuery(String op, DatabaseType<D> type,
+                                                      TriFunction<DatabaseQuery<R, D>, D, Values, R> func) {
         return putQuery(new DatabaseQuery<>(op, type, func));
     }
 

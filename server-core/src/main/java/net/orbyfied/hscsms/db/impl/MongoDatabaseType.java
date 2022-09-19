@@ -4,9 +4,11 @@ import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
+import net.orbyfied.hscsms.db.Database;
 import net.orbyfied.hscsms.db.DatabaseManager;
 import net.orbyfied.hscsms.db.DatabaseType;
 import net.orbyfied.hscsms.db.Login;
+import net.orbyfied.hscsms.util.Values;
 import net.orbyfied.j8.registry.Identifier;
 import net.orbyfied.j8.util.logging.Logger;
 
@@ -23,7 +25,7 @@ public class MongoDatabaseType extends DatabaseType<MongoDatabase> {
         Logger logger = DatabaseManager.LOGGER;
 
         try {
-            logger.info("Logging in database '" + database.getName() + "' of type " + ID);
+            logger.info("Logging in database '" + database.name() + "' of type " + ID);
 
             if (!(login instanceof Login.URILogin))
                 throw new IllegalArgumentException("login must be a URILogin");
@@ -43,9 +45,9 @@ public class MongoDatabaseType extends DatabaseType<MongoDatabase> {
             // get database
             database.db = mongoClient.getDatabase("mc");
 
-            logger.ok("Successfully logged in database '" + database.getName() + "'");
+            logger.ok("Successfully logged in database '" + database.name() + "'");
         } catch (Exception e) {
-            logger.err("Error while logging in database '" + database.getName() + "'", e);
+            logger.err("Error while logging in database '" + database.name() + "'", e);
             e.printStackTrace();
         }
     }
@@ -53,6 +55,11 @@ public class MongoDatabaseType extends DatabaseType<MongoDatabase> {
     @Override
     protected void close(MongoDatabase database) {
         database.client.close();
+    }
+
+    @Override
+    protected void putEnv(Database db, Values values) {
+
     }
 
 }
