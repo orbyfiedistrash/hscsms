@@ -1,0 +1,1 @@
+java -jar executable-server-0.1.0-all.jar --work-dir ./test-dir
