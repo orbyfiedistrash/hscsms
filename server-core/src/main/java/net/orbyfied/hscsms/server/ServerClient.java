@@ -8,11 +8,16 @@ import net.orbyfied.hscsms.network.handler.HandlerNode;
 import net.orbyfied.hscsms.network.handler.NodeAction;
 import net.orbyfied.hscsms.network.handler.SocketNetworkHandler;
 import net.orbyfied.hscsms.common.protocol.DisconnectReason;
+import net.orbyfied.hscsms.server.resource.User;
 import net.orbyfied.hscsms.service.Logging;
+import net.orbyfied.hscsms.util.Values;
 import net.orbyfied.j8.util.logging.Logger;
 import net.orbyfied.j8.util.logging.formatting.TextFormat;
 
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.Arrays;
 
 public class ServerClient {
 
@@ -145,6 +150,73 @@ public class ServerClient {
 
         // return
         return this;
+    }
+
+    // called when a secure, encrypted
+    // connection has been established
+    protected void onEncryptionReady() {
+        // allow login to a user now
+        authenticateAndLogin("orbyfied", "hhr3");
+    }
+
+    /* ---------- User ----------- */
+
+    protected record AuthenticationResult(User user, boolean success, Object t) {
+        public static AuthenticationResult ofSuccess(User user) {
+            return new AuthenticationResult(user, true, null);
+        }
+
+        public static AuthenticationResult failPreFind(Object t) {
+            return new AuthenticationResult(null, false, t);
+        }
+
+        public static AuthenticationResult failPostFind(User user, Object t) {
+            return new AuthenticationResult(user, false, t);
+        }
+    }
+
+    protected AuthenticationResult authenticateAndLogin(String username,
+                                                        String password) {
+        // find user by username
+        User user = server.resourceManager
+                .loadDatabaseResourceFiltered(User.TYPE, new Values()
+                        .set("username", username));
+
+        // check if we found a user
+        if (user == null) {
+            return AuthenticationResult.failPreFind("unknown_user");
+        }
+
+        try {
+            // digest password and compare
+            byte[] digestedProvidedPassword = MessageDigest.getInstance("SHA-256")
+                    .digest(password.getBytes(StandardCharsets.UTF_8));
+
+            // compare
+            boolean pwMatches = Arrays.equals(digestedProvidedPassword, user.getPasswordHash());
+            if (!pwMatches) {
+                return AuthenticationResult
+                        .failPostFind(user, "invalid_password");
+            }
+        } catch (Exception e) {
+            LOGGER.err("Error while checking login of client {0} to user {1}", this, user.localID());
+            e.printStackTrace();
+            return AuthenticationResult.failPostFind(user, e);
+        }
+
+        // log in client
+        this.user = user;
+        this.user.login(this);
+
+        // return success
+        return AuthenticationResult.ofSuccess(user);
+    }
+
+    protected void logOut() {
+        // log out
+        user.logout(this);
+        // dispose of user resource
+        server.resourceManager().unloadResource(user);
     }
 
     /* ---------- Other ------------ */

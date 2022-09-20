@@ -100,20 +100,24 @@ public abstract class ServerResourceType<R extends ServerResource> {
         // find document
         DatabaseItem item = findDatabaseResourceLocal(manager, manager.requireDatabase(), localId);
 
-        // get properties
-        UUID uuid = item.get("uuid", UUID.class);
+        if (item != null) {
+            // get properties
+            UUID uuid = item.get("uuid", UUID.class);
 
-        // construct instance
-        R resource = newInstanceInternal(uuid, localId);
+            // construct instance
+            R resource = newInstanceInternal(uuid, localId);
 
-        // load data
-        loadResourceSafe(manager, item, resource);
+            // load data
+            loadResourceSafe(manager, item, resource);
 
-        // add loaded
-        manager.addLoaded(resource);
+            // add loaded
+            manager.addLoaded(resource);
 
-        // return
-        return resource;
+            // return
+            return resource;
+        } else {
+            return null;
+        }
     }
 
     @SuppressWarnings("unchecked")

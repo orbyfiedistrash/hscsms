@@ -21,6 +21,7 @@ import java.net.Socket;
 import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Server {
@@ -217,11 +218,19 @@ public class Server {
                 // accept connection (blocking)
                 Socket clientSocket = socket.accept();
 
-                // add client
                 try {
-                    ServerClient client = new ServerClient(this, clientSocket);
+                    // construct client
+                    final ServerClient client = new ServerClient(this, clientSocket);
+                    // register client
                     clients.add(client);
+                    // start client worker
                     client.start();
+
+                    // run additional tasks asynchronously
+                    CompletableFuture.runAsync(() -> {
+                        // ready encryption
+                        client.readyTopLevelEncryption();
+                    });
 
                     ServerClient.LOGGER.info("Accepted and started {0}", client);
                 } catch (Exception e) {

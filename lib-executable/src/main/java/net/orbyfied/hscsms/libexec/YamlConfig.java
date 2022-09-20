@@ -1,4 +1,4 @@
-package net.orbyfied.hscsms;
+package net.orbyfied.hscsms.libexec;
 
 import net.orbyfied.hscsms.util.Values;
 import org.yaml.snakeyaml.Yaml;
@@ -11,7 +11,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-public class ServerYamlConfig {
+public class YamlConfig {
 
     // yaml instance
     private static final Yaml yaml = new Yaml();

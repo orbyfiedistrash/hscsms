@@ -1,5 +1,8 @@
-package net.orbyfied.hscsms;
+package net.orbyfied.hscsms.client;
 
+import net.orbyfied.hscsms.client.app.ClientApp;
+import net.orbyfied.hscsms.client.app.ConnectScreenAC;
+import net.orbyfied.hscsms.client.applib.impl.ExitAC;
 import net.orbyfied.hscsms.common.protocol.PacketServerboundDisconnect;
 import net.orbyfied.hscsms.network.NetworkManager;
 import net.orbyfied.hscsms.network.handler.SocketNetworkHandler;
@@ -34,6 +37,11 @@ public class ClientMain {
     public final SocketNetworkHandler networkHandler =
              new SocketNetworkHandler(networkManager, null);
 
+    /**
+     * The client application.
+     */
+    public ClientApp app;
+
     public void disconnect() {
         if (networkHandler.isOpen()) {
             networkHandler.sendSync(new PacketServerboundDisconnect());
@@ -67,9 +75,16 @@ public class ClientMain {
         return client;
     }
 
-    public static void main(String[] args) {
-        // create client
-        client = new ClientMain();
+    public void run() {
+        // create application
+        app = new ClientApp(this);
+
+        {
+            app.appContextManager.addContext(ExitAC::new);
+            app.appContextManager.addContext(ConnectScreenAC::new);
+        }
+
+        app.appContextManager.setCurrentContext("connect_screen");
 
         // prepare input
         Scanner scanner = new Scanner(System.in);
@@ -83,11 +98,11 @@ public class ClientMain {
             port = Integer.parseInt(addr[1]);
 
         // connect to server
-        client.reconnect(new InetSocketAddress(host, port));
+        reconnect(new InetSocketAddress(host, port));
         System.out.println();
 
         // while socket is open
-        Socket socket = client.networkHandler.getSocket();
+        Socket socket = networkHandler.getSocket();
         while (!socket.isClosed()) {
             // get line
             String line = scanner.nextLine();
@@ -97,7 +112,7 @@ public class ClientMain {
                 // get command
                 String cmdStr = line.substring(1);
                 if ("q".equals(cmdStr)) {
-                    client.disconnect();
+                    disconnect();
                     break;
                 }
             } else {
@@ -108,13 +123,19 @@ public class ClientMain {
 
         // disconnect socket
         try {
-            if (client.networkHandler.active()) {
-                client.networkHandler.disconnect();
-                client.networkHandler.stop();
+            if (networkHandler.active()) {
+                networkHandler.disconnect();
+                networkHandler.stop();
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public static void main(String[] args) {
+        // create client
+        client = new ClientMain();
+        client.run();
     }
 
 }

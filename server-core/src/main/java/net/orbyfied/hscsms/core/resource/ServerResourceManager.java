@@ -17,11 +17,12 @@ import net.orbyfied.hscsms.util.Values;
 import net.orbyfied.j8.registry.Identifier;
 import net.orbyfied.j8.util.logging.Logger;
 import net.orbyfied.j8.util.reflect.Reflector;
-import org.bson.BsonInt32;
 import org.bson.Document;
+import org.bson.conversions.Bson;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -166,13 +167,15 @@ public class ServerResourceManager {
         return this;
     }
 
-    public ServerResource getLoadedLocal(ServerResourceType type,
-                                   UUID id) {
-        return resourcesByLID.get(getMemoryMapLocalKey(type.idHash, id));
+    @SuppressWarnings("unchecked")
+    public <R extends ServerResource> R getLoadedLocal(ServerResourceType type,
+                                                       UUID id) {
+        return (R) resourcesByLID.get(getMemoryMapLocalKey(type.idHash, id));
     }
 
-    public ServerResource getLoadedUniversal(UUID uuid) {
-        return resourcesByUUID.get(uuid);
+    @SuppressWarnings("unchecked")
+    public <R extends ServerResource> R getLoadedUniversal(UUID uuid) {
+        return (R) resourcesByUUID.get(uuid);
     }
 
     /* ---- Functional ---- */
@@ -212,6 +215,17 @@ public class ServerResourceManager {
         return resource;
     }
 
+    /**
+     * Loads a resource using the universal ID, first
+     * checking if it has already been loaded, if not,
+     * it will retrieve the data from the database,
+     * resolve the type and load the data by calling
+     * {@link ServerResourceType#loadResourceSafe(ServerResourceManager, DatabaseItem, ServerResource)}
+     *
+     * @param uuid The universal ID.
+     * @param <R> The resource class.
+     * @return The resource or null if absent.
+     */
     @SuppressWarnings("unchecked")
     public <R extends ServerResource> R loadResource(UUID uuid) {
         // try and index cache
@@ -219,31 +233,41 @@ public class ServerResourceManager {
         if ((res = getLoadedUniversal(uuid)) != null)
             return (R) res;
 
-        // check database open
-
         // find document
         DatabaseItem item = findDatabaseResource(uuid);
+        if (item != null) {
+            // get properties
+            UUID localId = item.get("localId", UUID.class);
+            int typeHash = item.get("type", Integer.class);
 
-        // get properties
-        UUID localId  = item.get("localId", UUID.class);
-        int  typeHash = item.get("type", Integer.class);
+            // get type
+            ServerResourceType<R> type = getType(typeHash);
 
-        // get type
-        ServerResourceType<R> type = getType(typeHash);
+            // construct instance
+            R resource = type.newInstanceInternal(uuid, localId);
 
-        // construct instance
-        R resource = type.newInstanceInternal(uuid, localId);
+            // load data
+            type.loadResourceSafe(this, item, resource);
 
-        // load data
-        type.loadResourceSafe(this, item, resource);
+            // add loaded
+            addLoaded(resource);
 
-        // add loaded
-        addLoaded(resource);
-
-        // return
-        return resource;
+            // return
+            return resource;
+        } else {
+            return null;
+        }
     }
 
+    /**
+     * Loads a resource using the type and local ID,
+     * it first checks if the resource has already been
+     * loaded, if not, it will call {@link ServerResourceType#loadResourceLocal(ServerResourceManager, UUID)}
+     * @param type The resource type.
+     * @param localId The local ID.
+     * @param <R> The resource class.
+     * @return The resource or null if absent.
+     */
     @SuppressWarnings("unchecked")
     public <R extends ServerResource> R loadResourceLocal(ServerResourceType<R> type,
                                                           UUID localId) {
@@ -251,6 +275,46 @@ public class ServerResourceManager {
         if ((resource = getLoadedLocal(type, localId)) != null)
             return (R) resource;
         return type.loadResourceLocal(this, localId);
+    }
+
+    /**
+     * Loads a database resource using a filter provided,
+     * the filter will check each key value pair by equality.
+     * Once an item is retrieved, it will first check if the
+     * resource is already loaded, if not, it will load the resource.
+     * @param type The resource type.
+     * @param eqFilter The equality filter.
+     * @param <R> The resource class.
+     * @return The resource or null if absent.
+     */
+    public <R extends ServerResource> R loadDatabaseResourceFiltered(ServerResourceType<R> type,
+                                                                     Values eqFilter) {
+        // find database item
+        DatabaseItem item = findDatabaseResourceFiltered(type, eqFilter);
+
+        // load resource if not null
+        if (item != null) {
+            // check resource is loaded already
+            UUID uuid = item.get("uuid", UUID.class);
+            R resource;
+            if ((resource = getLoadedUniversal(uuid)) == null) {
+                // construct resource
+                resource = type.newInstanceInternal(
+                        uuid,
+                        item.get("localId", UUID.class)
+                );
+
+                addLoaded(resource);
+
+                // load data
+                type.loadResourceSafe(this, item, resource);
+            }
+
+            // return
+            return resource;
+        } else {
+            return null;
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -343,6 +407,19 @@ public class ServerResourceManager {
         return item;
     }
 
+    public DatabaseItem findDatabaseResourceFiltered(ServerResourceType type,
+                                                     Values eqFilter) {
+        // execute query
+        QueryPool pool = getLocalQueryPool();
+        DatabaseItem item = pool.current(requireDatabase())
+                .querySync("find_resource_filter", new Values()
+                        .setRaw("typeHash", type.idHash)
+                        .setRaw("filter", eqFilter));
+
+        // return item
+        return item;
+    }
+
     /* ---- Database ---- */
 
     public boolean isDatabaseOpen() {
@@ -372,6 +449,15 @@ public class ServerResourceManager {
         return collection;
     }
 
+    private Bson mongoToFilterEq(Values values) {
+        Bson[] bsons = new Bson[values.getSize()];
+        int i = 0;
+        for (Map.Entry<String, Object> entry : values.entrySet()) {
+            bsons[i++] = Filters.eq(entry.getKey(), entry.getValue());
+        }
+        return Filters.and(bsons);
+    }
+
     private void loadQueryPoolPresets(QueryPool pool) {
 
         pool.putQuery("find_resource_uuid", DatabaseType.MONGO_DB, (query, database, values) -> {
@@ -397,6 +483,22 @@ public class ServerResourceManager {
                     Filters.and(Filters.eq("localId", values.get("localId")),
                             Filters.eq("type", values.get("typeHash")))
             ).projection(Projections.excludeId()).first();
+            if (doc != null) {
+                return new MongoDatabaseItem(database, "uuid", collection, doc.get("uuid", UUID.class))
+                        .pull();
+            } else {
+                return null;
+            }
+        });
+
+        pool.putQuery("find_resource_filter", DatabaseType.MONGO_DB, (query, database, values) -> {
+            // get collection
+            MongoCollection<Document> collection = mongoGetOrCreateResCollection(database.getDatabaseClient());
+            Document doc = collection.find(
+                    Filters.and(Filters.eq("type", values.get("typeHash")),
+                            mongoToFilterEq(values.get("filter")))
+            ).projection(Projections.excludeId()).first();
+
             if (doc != null) {
                 return new MongoDatabaseItem(database, "uuid", collection, doc.get("uuid", UUID.class))
                         .pull();

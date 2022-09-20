@@ -103,11 +103,17 @@ public class Values {
     }
 
     public Values setRaw(String key, Object val) {
+        if (val == this)
+            throw new IllegalArgumentException("cannot put this recursively, attempted under key '" + key + "'");
         this.map.put(key, val);
         return this;
     }
 
     public Values set(String key, Object val) {
+        // check value isnt this
+        if (val == this)
+            throw new IllegalArgumentException("cannot put this recursively, attempted under key '" + key + "'");
+
         // split and check key
         String[] path = key.split("\\.");
         if (path.length == 0)
@@ -278,6 +284,6 @@ public class Values {
             i++;
         }
 
-        return b.toString();
+        return b.append(" }").toString();
     }
 }

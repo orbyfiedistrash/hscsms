@@ -14,6 +14,11 @@ version '0.1.0'
  */
 
 tasks {
+
+    build {
+        dependsOn(shadowJar)
+    }
+
     compileJava {
         options.encoding = "utf8"
         options.release.set(17) }
@@ -25,10 +30,11 @@ tasks {
 
         manifest {
             attributes(
-                    'Main-Class': 'net.orbyfied.hscsms.client.ClientMain'
+                    'Main-Class': 'net.orbyfied.hscsms.ServerMain'
             )
         }
     }
+
 }
 
 /*
@@ -52,7 +58,6 @@ dependencies {
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.0'
 
     // subprojects
-    implementation project(":lib-executable")
     implementation project(":server-core")
 
     // libraries
