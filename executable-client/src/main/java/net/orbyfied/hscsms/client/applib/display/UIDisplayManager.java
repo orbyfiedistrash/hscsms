@@ -25,9 +25,9 @@ public class UIDisplayManager {
 
     void loadIconImage() {
         try {
-            iconImage = ImageIO.read(app.getDataFolder().resolve("icon-750x750.png").toFile());
+            iconImage = ImageIO.read(app.getAssetFolder().resolve("icon-750x750.png").toFile());
         } catch (Exception e) {
-            System.out.println("Failed to load icon image;");
+            System.err.println("UIDisplayManager: Failed to load icon image;");
             e.printStackTrace();
         }
     }

@@ -15,5 +15,6 @@ gradle-app.setting
 gradle/wrapper/gradle-wrapper.properties
 
 # builds
-/builds
+/builds/
 !/builds/run-server.bat
+!/builds/assets/

@@ -15,6 +15,9 @@ public class ArgParser {
     Map<String, Class<?>> spec = new HashMap<>();
     // positioned args specification
     List<Class<?>> posSpec = new ArrayList<>();
+    // required argument names
+    List<String> reqArgs = new ArrayList<>();
+
     // string parsers
     Map<Class<?>, Function<StringReader, Object>> parsers = new HashMap<>();
 
@@ -64,32 +67,46 @@ public class ArgParser {
                 // get type from spec
                 Class<?> type = spec.get(key);
                 if (type == null)
-                    throw new IllegalArgumentException("ArgParser: unknown named arg '" + key + "' "
+                    throw new ArgParseException("unknown named arg '" + key + "' "
                             + pi + " ('" + str + "' @ " + argReader.index() + ")");
                 Function<StringReader, Object> parser = parsers.get(type);
                 if (parser == null)
-                    throw new IllegalArgumentException("ArgParser: dont know how to parse type '" + type.getName() + "'");
+                    throw new ArgParseException("dont know how to parse type '" + type.getName() + "'");
 
                 // search for value
                 String valStr = argReader.next();
                 if (valStr == null)
-                    throw new IllegalArgumentException("ArgParser: expected value of type '" + type.getName() + "' for arg '" + key + "'");
+                    throw new ArgParseException("expected value of type '" + type.getName() + "' for arg '" + key + "'");
 
                 // parse value
-                Object val = parser.apply(new StringReader(valStr));
+                Object val;
+                try {
+                    val = parser.apply(new StringReader(valStr));
+                } catch (Exception e) {
+                    throw new ArgParseException("error while parsing arg '" + key
+                            + "' of type '" + type.getName() + "'", e);
+                }
+
                 values.setRaw(key, val);
             } else {
                 // get type from spec
                 if (pi >= posSpec.size())
-                    throw new IllegalArgumentException("ArgParser: unexpected positioned arg "
+                    throw new ArgParseException("unexpected positioned arg "
                             + pi + " ('" + str + "' @ " + argReader.index() + ")");
                 Class<?> type = posSpec.get(pi);
                 Function<StringReader, Object> parser = parsers.get(type);
                 if (parser == null)
-                    throw new IllegalArgumentException("ArgParser: dont know how to parse type '" + type.getName() + "'");
+                    throw new ArgParseException("dont know how to parse type '" + type.getName() + "'");
 
                 // parse value
-                Object val = parser.apply(new StringReader(str));
+                Object val;
+                try {
+                    val = parser.apply(new StringReader(str));
+                } catch (Exception e) {
+                    throw new ArgParseException("error while parsing positioned arg " + pi
+                            + " of type '" + type.getName() + "'", e);
+                }
+
                 values.setRaw("#" + pi, val);
                 positionedValues.add(val);
 
@@ -99,6 +116,13 @@ public class ArgParser {
 
             // advance
             argReader.next();
+        }
+
+        // check required args
+        for (String rKey : reqArgs) {
+            // check if the required argument is present
+            if (!values.contains(rKey))
+                throw new ArgParseException("required arg '" + rKey + "' is not present");
         }
 
         // return values

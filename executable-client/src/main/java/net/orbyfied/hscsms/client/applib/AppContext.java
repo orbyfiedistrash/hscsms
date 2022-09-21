@@ -1,5 +1,7 @@
 package net.orbyfied.hscsms.client.applib;
 
+import net.orbyfied.hscsms.util.Values;
+
 public abstract class AppContext {
 
     protected final String name;
@@ -10,7 +12,7 @@ public abstract class AppContext {
         this.manager = manager;
     }
 
-    public abstract void enter();
+    public abstract void enter(Values values);
 
     public abstract void exit();
 

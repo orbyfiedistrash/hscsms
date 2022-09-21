@@ -1,6 +1,7 @@
 package net.orbyfied.hscsms.client.applib;
 
 import net.orbyfied.hscsms.client.app.ClientApp;
+import net.orbyfied.hscsms.util.Values;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -38,6 +39,11 @@ public class AppContextManager {
     }
 
     public AppContextManager setCurrentContext(AppContext currentContext) {
+        return setCurrentContext(currentContext, new Values());
+    }
+
+    public AppContextManager setCurrentContext(AppContext currentContext,
+                                               Values values) {
         AppContext oldCtx = this.currentContext;
         this.currentContext = currentContext;
         if (currentContext != oldCtx) {
@@ -47,7 +53,7 @@ public class AppContextManager {
             }
 
             if (currentContext != null) {
-                currentContext.enter();
+                currentContext.enter(values);
             }
 
             // log switch

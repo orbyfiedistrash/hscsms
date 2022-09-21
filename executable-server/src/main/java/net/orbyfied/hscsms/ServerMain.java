@@ -1,5 +1,6 @@
 package net.orbyfied.hscsms;
 
+import net.orbyfied.hscsms.libexec.ArgParseException;
 import net.orbyfied.hscsms.libexec.ArgParser;
 import net.orbyfied.hscsms.libexec.YamlConfig;
 import net.orbyfied.hscsms.server.Server;
@@ -28,9 +29,17 @@ public class ServerMain {
 
     public static void main(String[] args) {
         // parse args
-        Values argVals = new ArgParser()
-                .withArgument("work-dir", Path.class)
-                .parseConsoleArgs(args);
+        Values argVals;
+        try {
+            argVals = new ArgParser()
+                    .withArgument("work-dir", Path.class)
+                    .parseConsoleArgs(args);
+        } catch (ArgParseException e) {
+            System.err.println("Error ArgParser: " + e.getMessage());
+            if (e.getCause() != null)
+                e.getCause().printStackTrace();
+            return;
+        }
 
         // set properties
         workingDir = argVals.getOrDefault("work-dir", workingDir);

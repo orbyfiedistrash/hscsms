@@ -4,14 +4,18 @@ import net.orbyfied.hscsms.client.app.ClientApp;
 import net.orbyfied.hscsms.client.app.ConnectScreenAC;
 import net.orbyfied.hscsms.client.applib.impl.ExitAC;
 import net.orbyfied.hscsms.common.protocol.PacketServerboundDisconnect;
+import net.orbyfied.hscsms.libexec.ArgParseException;
+import net.orbyfied.hscsms.libexec.ArgParser;
 import net.orbyfied.hscsms.network.NetworkManager;
 import net.orbyfied.hscsms.network.handler.SocketNetworkHandler;
 import net.orbyfied.hscsms.server.ServerClient;
 import net.orbyfied.hscsms.service.Logging;
+import net.orbyfied.hscsms.util.Values;
 import net.orbyfied.j8.util.logging.Logger;
 
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.nio.file.Path;
 import java.util.Scanner;
 
 public class ClientMain {
@@ -36,6 +40,11 @@ public class ClientMain {
      */
     public final SocketNetworkHandler networkHandler =
              new SocketNetworkHandler(networkManager, null);
+
+    /**
+     * The working directory.
+     */
+    public Path workDir;
 
     /**
      * The client application.
@@ -75,7 +84,23 @@ public class ClientMain {
         return client;
     }
 
-    public void run() {
+    public void run(String[] args) {
+        // parse args
+        Values argVals;
+        try {
+            argVals = new ArgParser()
+                    .withArgument("work-dir", Path.class)
+                    .parseConsoleArgs(args);
+        } catch (ArgParseException e) {
+            System.err.println("Error ArgParser: " + e.getMessage());
+            if (e.getCause() != null)
+                e.getCause().printStackTrace();
+            return;
+        }
+
+        // set properties
+        workDir = argVals.getOrDefault("work-dir", Path.of("./hscsms-client"));
+
         // create application
         app = new ClientApp(this);
 
@@ -90,7 +115,6 @@ public class ClientMain {
         Scanner scanner = new Scanner(System.in);
 
         // input address
-        System.out.print("Server Address: ");
         String[] addr = scanner.nextLine().split(":");
         String host = addr[0];
         int port = 42069;
@@ -135,7 +159,7 @@ public class ClientMain {
     public static void main(String[] args) {
         // create client
         client = new ClientMain();
-        client.run();
+        client.run(args);
     }
 
 }

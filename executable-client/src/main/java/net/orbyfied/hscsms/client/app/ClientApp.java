@@ -16,24 +16,32 @@ public class ClientApp {
 
     // main instance of client
     public final ClientMain main;
+    // main asset folder
+    public final Path assetFolder;
     // main data folder
-    public final Path dataFolder;
+    public final Path userDataFolder;
 
     // services
     public final UIDisplayManager displayManager = new UIDisplayManager(this);
     public final AppContextManager appContextManager = new AppContextManager(this);
 
     public ClientApp(ClientMain main) {
-        this.main       = main;
-        this.dataFolder = Path.of("client-data");
+        this.main = main;
 
         // setup
+        this.assetFolder = main.workDir.resolve("assets");
+        this.userDataFolder = main.workDir.resolve("userdata");
+
         appContextManager.load();
         displayManager.load();
     }
 
-    public Path getDataFolder() {
-        return dataFolder;
+    public Path getAssetFolder() {
+        return assetFolder;
+    }
+
+    public Path getUserDataFolder() {
+        return userDataFolder;
     }
 
     public AppContextManager getAppContextManager() {
