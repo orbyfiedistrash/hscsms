@@ -47,7 +47,7 @@ public class ArgParser {
         return this;
     }
 
-    public Values parseArgs(List<String> args) {
+    public Values parseArgsUnchecked(List<String> args) {
         // prepare storage
         Values values = new Values();
         List<Object> positionedValues = new ArrayList<>(posSpec.size());
@@ -118,6 +118,11 @@ public class ArgParser {
             argReader.next();
         }
 
+        // return values
+        return values;
+    }
+
+    public Values checkRequired(Values values) {
         // check required args
         for (String rKey : reqArgs) {
             // check if the required argument is present
@@ -127,6 +132,10 @@ public class ArgParser {
 
         // return values
         return values;
+    }
+
+    public Values parseArgs(List<String> args) {
+        return checkRequired(parseArgsUnchecked(args));
     }
 
     public Values parseConsoleArgs(String[] oldArgs) {

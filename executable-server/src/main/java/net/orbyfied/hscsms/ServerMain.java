@@ -14,7 +14,7 @@ import java.nio.file.Path;
 public class ServerMain {
 
     static {
-        Logging.setFormatted(false);
+        Logging.setFormatted(true);
     }
 
     // server main logger

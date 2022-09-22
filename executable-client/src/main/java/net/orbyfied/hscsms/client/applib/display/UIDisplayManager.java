@@ -3,6 +3,7 @@ package net.orbyfied.hscsms.client.applib.display;
 import net.orbyfied.hscsms.client.app.ClientApp;
 
 import javax.imageio.ImageIO;
+import javax.swing.*;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -34,7 +35,7 @@ public class UIDisplayManager {
 
     void initLookAndFeel() {
         try {
-
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         } catch (Exception e) {
             e.printStackTrace();
         }

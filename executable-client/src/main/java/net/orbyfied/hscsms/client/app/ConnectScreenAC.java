@@ -1,17 +1,15 @@
 package net.orbyfied.hscsms.client.app;
 
-import net.orbyfied.hscsms.client.ClientMain;
-import net.orbyfied.hscsms.client.applib.*;
+import net.orbyfied.hscsms.client.applib.AppContext;
+import net.orbyfied.hscsms.client.applib.AppContextManager;
 import net.orbyfied.hscsms.client.applib.display.UIDisplay;
-import net.orbyfied.hscsms.server.Server;
 import net.orbyfied.hscsms.util.Values;
 
 import javax.swing.*;
 import java.awt.*;
-import java.io.FileReader;
+import java.awt.event.ActionEvent;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.StringReader;
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,6 +28,9 @@ public class ConnectScreenAC extends AppContext {
     // gui
     JPanel mainPanel;
     JList<ServerListItem> serverList;
+    JPanel controlPanel;
+    JButton connectButton;
+    JTextField addressField;
 
     // data
     List<ServerListItem> serverItems = new ArrayList<>();
@@ -37,6 +38,7 @@ public class ConnectScreenAC extends AppContext {
     // gui utils
     private Font fontA = new Font("Sans Serif", Font.BOLD, 20);
     private Font fontB = new Font("Sans Serif", Font.PLAIN, 10);
+    private Font fontC = new Font("Sans Serif", Font.PLAIN, 16);
 
     @Override
     public void enter(Values values) {
@@ -52,9 +54,36 @@ public class ConnectScreenAC extends AppContext {
                     mainPanel = new JPanel();
                     window.add(mainPanel);
                     mainPanel.setBackground(Color.DARK_GRAY);
-
-                    // set null layout
                     mainPanel.setLayout(null);
+
+                    // create control panel
+                    controlPanel = new JPanel();
+                    controlPanel.setBounds(0, 0, 300, 600);
+                    controlPanel.setLayout(null);
+                    controlPanel.setBackground(Color.DARK_GRAY);
+                    mainPanel.add(controlPanel);
+
+                    // create connect controls
+                    connectButton = new JButton("Connect");
+                    addressField  = new JTextField();
+                    addressField.setToolTipText("Enter Address");
+                    addressField.setFont(fontC);
+                    connectButton.setBackground(Color.GRAY);
+                    connectButton.setForeground(Color.BLACK);
+                    addressField.setBackground(Color.GRAY);
+                    addressField.setForeground(Color.WHITE);
+                    connectButton.setBounds(0, 15, 300, 35);
+                    addressField.setBounds(0, 15 + 35 + 5, 300, 35);
+
+                    connectButton.addActionListener(new AbstractAction() {
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+                            prepareConnect(addressField.getText());
+                        }
+                    });
+
+                    controlPanel.add(connectButton);
+                    controlPanel.add(addressField);
 
                     // create list
                     serverList = new JList<>(new DefaultListModel<>());
@@ -89,10 +118,7 @@ public class ConnectScreenAC extends AppContext {
                         return item;
                     });
 
-                    CompletableFuture.runAsync(this::loadServerList)
-                            .whenComplete((__, t) -> {
-
-                            });
+                    CompletableFuture.runAsync(this::loadServerList);
                 })
                 .show(true);
     }
@@ -105,6 +131,80 @@ public class ConnectScreenAC extends AppContext {
     }
 
     /* ---- Functional ---- */
+
+    private void initiateConnect(InetSocketAddress address) {
+        ClientApp.LOGGER.info("GUI initiated connect to " + address);
+        manager.getApp().main.reconnect(address);
+    }
+
+    private void errDialogIaf() {
+        // error
+        JDialog dialog = new JDialog();
+        dialog.setTitle("Connect Error");
+        JLabel label = new JLabel();
+        label.setText("Invalid Address Format");
+        label.setFont(fontC);
+        dialog.add(label);
+        dialog.pack();
+        dialog.setVisible(true);
+    }
+
+    private void prepareConnect(String address) {
+        if (address == null || address.isEmpty()) {
+            errDialogIaf();
+            return;
+        }
+        String[] addrParts = address.split(":");
+        if (addrParts.length < 1) {
+            errDialogIaf();
+            return;
+        }
+        String host = addrParts[0];
+        int port;
+        if (addrParts.length < 2)
+            port = 42069;
+        else
+            port = Integer.parseInt(addrParts[1]);
+        if (host.equals("localhost"))
+            host = "0.0.0.0";
+        final InetSocketAddress socketAddress = new InetSocketAddress(host, port);
+
+        // confirm connect
+        JDialog dialog = new JDialog();
+        dialog.setPreferredSize(new Dimension(400, 150));
+        dialog.setLayout(null);
+        dialog.setTitle("Confirm Connection");
+        JLabel label = new JLabel("Confirm Connection To " + socketAddress);
+        label.setBounds(0, 0, 400, 50);
+        label.setFont(fontC);
+        dialog.add(label);
+
+        JButton cancel = new JButton("Cancel");
+        cancel.setBounds(0, 50, 200, 50);
+        cancel.addActionListener(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                dialog.setVisible(false);
+            }
+        });
+
+        JButton confirm = new JButton("Confirm");
+        confirm.setBounds(200, 50, 200, 50);
+        confirm.addActionListener(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                // initiate connect
+                dialog.setVisible(false);
+                initiateConnect(socketAddress);
+            }
+        });
+
+        dialog.add(label);
+        dialog.add(cancel);
+        dialog.add(confirm);
+        dialog.pack();
+        dialog.setVisible(true);
+    }
 
     public record ServerListItem(String name, String ip) { }
 

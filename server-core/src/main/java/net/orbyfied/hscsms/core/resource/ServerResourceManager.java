@@ -178,6 +178,10 @@ public class ServerResourceManager {
         return (R) resourcesByUUID.get(uuid);
     }
 
+    public <R extends ServerResource> ServerResourceHandle<R> createHandleUniversal(UUID uuid) {
+        return new ServerResourceHandle<>(this, uuid);
+    }
+
     /* ---- Functional ---- */
 
     /**
@@ -189,7 +193,7 @@ public class ServerResourceManager {
     public UUID createUniversalID() {
         return new UUID(
                 System.currentTimeMillis(),
-                System.nanoTime() ^ RANDOM.nextInt()
+                System.nanoTime()
         );
     }
 

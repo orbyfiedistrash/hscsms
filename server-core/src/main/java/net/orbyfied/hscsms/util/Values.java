@@ -215,7 +215,7 @@ public class Values {
     @SuppressWarnings({ "rawtypes", "unchecked" })
     void assignObject(Object obj, String key, Object val) {
         if (obj instanceof Values v) {
-            v.setRaw(key, v);
+            v.setRaw(key, val);
             return;
         } else if (obj instanceof Map m) {
             m.put(key, val);

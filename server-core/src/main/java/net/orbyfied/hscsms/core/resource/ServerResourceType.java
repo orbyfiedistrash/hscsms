@@ -6,6 +6,8 @@ import net.orbyfied.hscsms.db.QueryPool;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.hscsms.util.Values;
 import net.orbyfied.j8.registry.Identifier;
+import net.orbyfied.j8.util.functional.TriConsumer;
+import net.orbyfied.j8.util.functional.TriFunction;
 import net.orbyfied.j8.util.logging.Logger;
 
 import java.lang.reflect.Constructor;
@@ -14,6 +16,43 @@ import java.util.Random;
 import java.util.UUID;
 
 public abstract class ServerResourceType<R extends ServerResource> {
+
+    public static <R extends ServerResource> ServerResourceType<R> ofChronoIds(final Class<R> rClass,
+                                                                               final Identifier id,
+
+                                                                               final TriFunction<ServerResourceManager, DatabaseItem, R, ResourceSaveResult> saveR,
+                                                                               final TriFunction<ServerResourceManager, DatabaseItem, R, ResourceLoadResult> loadR) {
+        return new ServerResourceType<>(id, rClass) {
+            @Override
+            public UUID createLocalID() {
+                return new UUID(
+                        System.currentTimeMillis() * /* type hash */ idHash,
+                        System.nanoTime()
+                );
+            }
+
+            @Override
+            public ResourceSaveResult saveResource(ServerResourceManager manager, DatabaseItem dbItem, R resource) {
+                return saveR.apply(manager, dbItem, resource);
+            }
+
+            @Override
+            public ResourceLoadResult loadResource(ServerResourceManager manager, DatabaseItem dbItem, R resource) {
+                return loadR.apply(manager, dbItem, resource);
+            }
+        };
+    }
+
+    public static <R extends ServerResource> ServerResourceType<R> ofChronoIds(final Class<R> rClass,
+                                                                               final String id,
+
+                                                                               final TriFunction<ServerResourceManager, DatabaseItem, R, ResourceSaveResult> saveR,
+                                                                               final TriFunction<ServerResourceManager, DatabaseItem, R, ResourceLoadResult> loadR) {
+        return ofChronoIds(rClass, Identifier.of(id),
+                saveR, loadR);
+    }
+
+    /* ------------------------------------ */
 
     protected static final Logger LOGGER = Logging.getLogger("ServerResource");
 

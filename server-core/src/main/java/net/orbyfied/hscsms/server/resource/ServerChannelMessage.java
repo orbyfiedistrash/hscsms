@@ -1,46 +1,21 @@
 package net.orbyfied.hscsms.server.resource;
 
 import net.orbyfied.hscsms.core.resource.ServerResource;
-import net.orbyfied.hscsms.core.resource.ServerResourceManager;
 import net.orbyfied.hscsms.core.resource.ServerResourceType;
-import net.orbyfied.hscsms.db.DatabaseItem;
-import net.orbyfied.j8.registry.Identifier;
 
 import java.util.UUID;
 
-@SuppressWarnings("rawtypes")
 public class ServerChannelMessage extends ServerResource {
 
-    public static final Type TYPE = new Type();
-
-    public static class Type extends ServerResourceType<ServerChannelMessage> {
-
-        public Type() {
-            super(Identifier.of("channel_message"), ServerChannelMessage.class);
-        }
-
-        @Override
-        public UUID createLocalID() {
-            return new UUID(System.currentTimeMillis(), RANDOM.nextLong());
-        }
-
-        @Override
-        public ResourceSaveResult saveResource(ServerResourceManager manager, DatabaseItem dbItem, ServerChannelMessage resource) {
-            dbItem.set("content_raw", resource.getContentRaw());
-            dbItem.set("channel", manager.saveResourceReference(resource.channel));
-            return ResourceSaveResult.ofSuccess();
-        }
-
-        @Override
-        public ResourceLoadResult loadResource(ServerResourceManager manager, DatabaseItem dbItem, ServerChannelMessage resource) {
-            resource.contentRaw = dbItem.get("content_raw", String.class);
-            // force load the channel when
-            // one message inside it is loaded
-            resource.channel = manager.loadResourceReferenceSync(dbItem.get("channel", UUID.class));
-            return ResourceLoadResult.ofSuccess();
-        }
-
-    }
+    public static final ServerResourceType<ServerMessageChannel> TYPE = ServerResourceType.ofChronoIds(
+            ServerMessageChannel.class, "message",
+            (manager, databaseItem, serverMessageChannel) -> {
+                return ServerResourceType.ResourceSaveResult.ofSuccess();
+            },
+            (manager, databaseItem, serverMessageChannel) -> {
+                return ServerResourceType.ResourceLoadResult.ofSuccess();
+            }
+    );
 
     ///////////////////////////////////////////
 
