@@ -10,6 +10,7 @@ import net.orbyfied.hscsms.db.Login;
 import net.orbyfied.hscsms.db.impl.MongoDatabase;
 import net.orbyfied.hscsms.network.NetworkManager;
 import net.orbyfied.hscsms.network.handler.UtilityNetworkHandler;
+import net.orbyfied.hscsms.security.AsymmetricEncryptionProfile;
 import net.orbyfied.hscsms.security.LegacyEncryptionProfile;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.hscsms.util.SafeWorker;
@@ -63,8 +64,8 @@ public class Server {
     /* ------ Security ----- */
 
     // the top level encryption
-    public final LegacyEncryptionProfile topLevelEncryption
-            = ProtocolSpec.newBlankEncryptionProfile();
+    public final AsymmetricEncryptionProfile topLevelEncryption
+            = ProtocolSpec.newAsymmetricEncryptionProfile();
 
     /* ------ Top-Level Services ------ */
 
@@ -133,7 +134,7 @@ public class Server {
 
         // generate top level key pair
         try {
-            topLevelEncryption.generateAsymmetricKeyPair();
+            topLevelEncryption.generateKeys();
             logger.ok("Generated top level RSA key pair");
         } catch (Exception e) {
             logger.err("Failed to generate top level RSA key pair");

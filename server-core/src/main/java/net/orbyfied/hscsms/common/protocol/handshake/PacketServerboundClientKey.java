@@ -5,11 +5,8 @@ import net.orbyfied.hscsms.network.PacketType;
 
 import javax.crypto.SecretKey;
 
-import static net.orbyfied.hscsms.common.ProtocolSpec.EP_SECRET;
-import static net.orbyfied.hscsms.common.ProtocolSpec.EP_UTILITY;
-
-import java.security.PrivateKey;
-import java.security.PublicKey;
+import static net.orbyfied.hscsms.common.ProtocolSpec.EP_ASYMMETRIC;
+import static net.orbyfied.hscsms.common.ProtocolSpec.EP_SYMMETRIC;
 
 public class PacketServerboundClientKey extends Packet {
 
@@ -17,13 +14,13 @@ public class PacketServerboundClientKey extends Packet {
             new PacketType<>(PacketServerboundClientKey.class, "hscsms/handshake/serverbound/clientkey")
                     .serializer((type, packet, stream) -> {
                         // encode key and write
-                        String key = EP_UTILITY.encodeSecretKey(packet.getKey());
+                        String key = EP_SYMMETRIC.encodeKeyToBase64(packet.getKey());
                         stream.writeUTF(key);
                     })
                     .deserializer((type, stream) -> {
                         // read and decode key
                         String keyStr = stream.readUTF();
-                        SecretKey key = EP_SECRET.decodeSecretKey(keyStr);
+                        SecretKey key = EP_SYMMETRIC.decodeKeyFromBase64(SecretKey.class, keyStr);
                         return new PacketServerboundClientKey(key);
                     });
 

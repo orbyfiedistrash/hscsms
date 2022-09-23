@@ -12,6 +12,7 @@ import net.orbyfied.hscsms.network.handler.NodeAction;
 import net.orbyfied.hscsms.network.handler.SocketNetworkHandler;
 import net.orbyfied.hscsms.common.protocol.DisconnectReason;
 import net.orbyfied.hscsms.security.LegacyEncryptionProfile;
+import net.orbyfied.hscsms.security.SymmetricEncryptionProfile;
 import net.orbyfied.hscsms.server.resource.User;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.hscsms.util.Values;
@@ -42,8 +43,8 @@ public class ServerClient {
     // the network handler
     SocketNetworkHandler networkHandler;
     // the client encryption profile
-    LegacyEncryptionProfile clientEncryptionProfile =
-            ProtocolSpec.newSymmetricSecretProfile();
+    SymmetricEncryptionProfile clientEncryptionProfile =
+            ProtocolSpec.newSymmetricEncryptionProfile();
 
     // the user this client has authenticated as
     // this is null at first
@@ -156,7 +157,7 @@ public class ServerClient {
         networkHandler.node().childForType(PacketServerboundClientKey.TYPE)
                 .<PacketServerboundClientKey>withHandler((handler, node, packet) -> {
                     // store key
-                    clientEncryptionProfile.withSecretKey(packet.getKey());
+                    clientEncryptionProfile.withKey("secret", packet.getKey());
                     networkHandler.withDecryptionProfile(clientEncryptionProfile);
 
                     // generate message and send ok packet

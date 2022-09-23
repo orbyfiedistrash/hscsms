@@ -15,7 +15,9 @@ import net.orbyfied.hscsms.network.handler.ChainAction;
 import net.orbyfied.hscsms.network.handler.HandlerNode;
 import net.orbyfied.hscsms.network.handler.NodeAction;
 import net.orbyfied.hscsms.network.handler.SocketNetworkHandler;
+import net.orbyfied.hscsms.security.AsymmetricEncryptionProfile;
 import net.orbyfied.hscsms.security.LegacyEncryptionProfile;
+import net.orbyfied.hscsms.security.SymmetricEncryptionProfile;
 import net.orbyfied.hscsms.server.ServerClient;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.hscsms.util.Values;
@@ -24,7 +26,6 @@ import net.orbyfied.j8.util.logging.Logger;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.file.Path;
-import java.util.Base64;
 import java.util.Scanner;
 
 public class ClientMain {
@@ -50,10 +51,10 @@ public class ClientMain {
     public SocketNetworkHandler networkHandler =
             new SocketNetworkHandler(networkManager, null);
 
-    public final LegacyEncryptionProfile serverEncryptionProfile =
-            ProtocolSpec.newBlankEncryptionProfile();
-    private final LegacyEncryptionProfile clientEncryptionProfile =
-            ProtocolSpec.newSymmetricSecretProfile();
+    public final AsymmetricEncryptionProfile serverEncryptionProfile =
+            ProtocolSpec.newAsymmetricEncryptionProfile();
+    private final SymmetricEncryptionProfile clientEncryptionProfile =
+            ProtocolSpec.newSymmetricEncryptionProfile();
 
     /**
      * The working directory.
@@ -87,7 +88,7 @@ public class ClientMain {
                     networkHandler.withDecryptionProfile(serverEncryptionProfile);
 
                     // generate private key
-                    clientEncryptionProfile.generateSymmetricKey();
+                    clientEncryptionProfile.generateKeys();
                     
                     // send serverbound private key packet, encrypted
                     networkHandler.sendSyncEncrypted(

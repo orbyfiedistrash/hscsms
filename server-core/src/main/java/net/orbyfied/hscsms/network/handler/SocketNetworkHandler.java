@@ -4,6 +4,7 @@ import net.orbyfied.hscsms.network.NetworkHandler;
 import net.orbyfied.hscsms.network.NetworkManager;
 import net.orbyfied.hscsms.network.Packet;
 import net.orbyfied.hscsms.network.PacketType;
+import net.orbyfied.hscsms.security.EncryptionProfile;
 import net.orbyfied.hscsms.security.LegacyEncryptionProfile;
 import net.orbyfied.hscsms.service.Logging;
 
@@ -30,7 +31,7 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
     Consumer<Throwable> disconnectHandler;
 
     // decryption profile
-    LegacyEncryptionProfile decryptionProfile;
+    EncryptionProfile decryptionProfile;
 
     public SocketNetworkHandler(final NetworkManager manager,
                                 final NetworkHandler parent) {
@@ -50,7 +51,7 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
         return this;
     }
 
-    public synchronized SocketNetworkHandler withDecryptionProfile(LegacyEncryptionProfile profile) {
+    public synchronized SocketNetworkHandler withDecryptionProfile(EncryptionProfile profile) {
         this.decryptionProfile = profile;
         return this;
     }
@@ -121,11 +122,11 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
         }
     }
 
-    public SocketNetworkHandler sendSyncEncrypted(Packet packet, LegacyEncryptionProfile encryption) {
+    public SocketNetworkHandler sendSyncEncrypted(Packet packet, EncryptionProfile encryption) {
         try {
             // create output stream
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            DataOutputStream stream    = encryption.encryptedOutputStream(baos);
+            DataOutputStream stream    = encryption.encryptingOutputStream(baos).toDataStream();
 
             // serialize packet
             packet.type().serializer().serialize(packet.type(), packet, stream);
@@ -210,7 +211,7 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
 
                             // create encrypted input stream
                             ByteArrayInputStream bais = new ByteArrayInputStream(encrypted);
-                            stream = decryptionProfile.encryptedInputStream(bais);
+                            stream = decryptionProfile.decryptingInputStream(bais).toDataStream();
                         }
 
                         // deserialize
