@@ -3,11 +3,19 @@ package net.orbyfied.hscsms.client;
 import net.orbyfied.hscsms.client.app.ClientApp;
 import net.orbyfied.hscsms.client.app.ConnectScreenAC;
 import net.orbyfied.hscsms.client.applib.impl.ExitAC;
+import net.orbyfied.hscsms.common.ProtocolSpec;
+import net.orbyfied.hscsms.common.protocol.handshake.PacketClientboundPublicKey;
 import net.orbyfied.hscsms.common.protocol.PacketServerboundDisconnect;
+import net.orbyfied.hscsms.common.protocol.handshake.PacketServerboundPrivateKey;
+import net.orbyfied.hscsms.common.protocol.handshake.PacketUnboundHandshakeOk;
 import net.orbyfied.hscsms.libexec.ArgParseException;
 import net.orbyfied.hscsms.libexec.ArgParser;
 import net.orbyfied.hscsms.network.NetworkManager;
+import net.orbyfied.hscsms.network.handler.ChainAction;
+import net.orbyfied.hscsms.network.handler.HandlerNode;
+import net.orbyfied.hscsms.network.handler.NodeAction;
 import net.orbyfied.hscsms.network.handler.SocketNetworkHandler;
+import net.orbyfied.hscsms.security.EncryptionProfile;
 import net.orbyfied.hscsms.server.ServerClient;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.hscsms.util.Values;
@@ -38,8 +46,13 @@ public class ClientMain {
     /**
      * Client network handler.
      */
-    public final SocketNetworkHandler networkHandler =
-             new SocketNetworkHandler(networkManager, null);
+    public SocketNetworkHandler networkHandler =
+            new SocketNetworkHandler(networkManager, null);
+
+    public final EncryptionProfile serverEncryptionProfile =
+            ProtocolSpec.newBlankEncryptionProfile();
+    private final EncryptionProfile clientEncryptionProfile =
+            ProtocolSpec.newBlankEncryptionProfile();
 
     /**
      * The working directory.
@@ -56,12 +69,61 @@ public class ClientMain {
             networkHandler.sendSync(new PacketServerboundDisconnect());
             networkHandler.disconnect();
             networkHandler.stop();
+
+            // create new network handler
+            // to reset handlers and stuff
+            networkHandler = new SocketNetworkHandler(networkManager, null);
         }
+    }
+
+    private void initHandshake() {
+
+        HandlerNode node = networkHandler.node();
+        node.childForType(PacketClientboundPublicKey.TYPE)
+                .<PacketClientboundPublicKey>withHandler((handler, node1, packet) -> {
+                    // set public key
+                    serverEncryptionProfile.withPublicKey(packet.getKey());
+                    networkHandler.withDecryptionProfile(serverEncryptionProfile);
+
+                    // generate private key
+                    clientEncryptionProfile.generateKeyPair(1024);
+
+                    // send serverbound private key packet, encrypted
+                    networkHandler.sendSyncEncrypted(
+                            new PacketServerboundPrivateKey(clientEncryptionProfile.getPrivateKey()),
+                            serverEncryptionProfile
+                    );
+
+                    // return and remove this node
+                    return new HandlerNode.Result(ChainAction.CONTINUE)
+                            .nodeAction(NodeAction.REMOVE);
+                });
+
+        node.childForType(PacketUnboundHandshakeOk.TYPE)
+                .<PacketUnboundHandshakeOk>withHandler((handler, node1, packet) -> {
+                    // modify message
+                    String message = packet.message + "-modified";
+
+                    // send new packet
+                    networkHandler.sendSyncEncrypted(new PacketUnboundHandshakeOk(message),
+                            clientEncryptionProfile);
+
+                    // return and remove this node
+                    return new HandlerNode.Result(ChainAction.CONTINUE)
+                            .nodeAction(NodeAction.REMOVE);
+                });
+
     }
 
     public void reconnect(Socket socket) {
         LOGGER.info("Reconnecting to [" + ServerClient.toStringAddress(socket) + "]");
+        // disconnect from current server
         disconnect();
+
+        // prepare handshake
+        initHandshake();
+
+        // connect
         networkHandler.connect(socket);
         networkHandler.start();
     }
@@ -84,6 +146,18 @@ public class ClientMain {
         return client;
     }
 
+    public void runApp() {
+        // create application
+        app = new ClientApp(this);
+
+        {
+            app.appContextManager.addContext(ExitAC::new);
+            app.appContextManager.addContext(ConnectScreenAC::new);
+        }
+
+        app.appContextManager.setCurrentContext("connect_screen");
+    }
+
     public void run(String[] args) {
         // parse args
         Values argVals;
@@ -101,15 +175,11 @@ public class ClientMain {
         // set properties
         workDir = argVals.getOrDefault("work-dir", Path.of("./hscsms-client"));
 
-        // create application
-        app = new ClientApp(this);
+        // run app
+//        runApp();
 
-        {
-            app.appContextManager.addContext(ExitAC::new);
-            app.appContextManager.addContext(ConnectScreenAC::new);
-        }
-
-        app.appContextManager.setCurrentContext("connect_screen");
+        // prepare protocol
+        ProtocolSpec.loadProtocol(networkManager);
 
         // prepare input
         Scanner scanner = new Scanner(System.in);
@@ -123,24 +193,17 @@ public class ClientMain {
 
         // connect to server
         reconnect(new InetSocketAddress(host, port));
-        System.out.println();
 
         // while socket is open
         Socket socket = networkHandler.getSocket();
         while (!socket.isClosed()) {
-            // get line
-            String line = scanner.nextLine();
-
-            // client command
-            if (line.startsWith("/")) {
-                // get command
-                String cmdStr = line.substring(1);
-                if ("q".equals(cmdStr)) {
-                    disconnect();
-                    break;
+            String s = scanner.nextLine();
+            if (s.startsWith("/")) {
+                String cmd = s.substring(1);
+                switch (cmd) {
+                    case "q" -> disconnect();
                 }
             } else {
-                // send message to server
 
             }
         }

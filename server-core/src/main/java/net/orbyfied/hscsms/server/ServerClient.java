@@ -1,13 +1,17 @@
 package net.orbyfied.hscsms.server;
 
+import net.orbyfied.hscsms.common.ProtocolSpec;
 import net.orbyfied.hscsms.common.protocol.PacketClientboundDisconnect;
-import net.orbyfied.hscsms.common.protocol.PacketClientboundPublicKey;
+import net.orbyfied.hscsms.common.protocol.handshake.PacketClientboundPublicKey;
 import net.orbyfied.hscsms.common.protocol.PacketServerboundDisconnect;
+import net.orbyfied.hscsms.common.protocol.handshake.PacketServerboundPrivateKey;
+import net.orbyfied.hscsms.common.protocol.handshake.PacketUnboundHandshakeOk;
 import net.orbyfied.hscsms.network.handler.ChainAction;
 import net.orbyfied.hscsms.network.handler.HandlerNode;
 import net.orbyfied.hscsms.network.handler.NodeAction;
 import net.orbyfied.hscsms.network.handler.SocketNetworkHandler;
 import net.orbyfied.hscsms.common.protocol.DisconnectReason;
+import net.orbyfied.hscsms.security.EncryptionProfile;
 import net.orbyfied.hscsms.server.resource.User;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.hscsms.util.Values;
@@ -18,6 +22,8 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Arrays;
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class ServerClient {
 
@@ -34,6 +40,9 @@ public class ServerClient {
 
     // the network handler
     SocketNetworkHandler networkHandler;
+    // the client encryption profile
+    EncryptionProfile clientEncryptionProfile =
+            ProtocolSpec.newBlankEncryptionProfile();
 
     // the user this client has authenticated as
     // this is null at first
@@ -136,10 +145,44 @@ public class ServerClient {
     }
 
     public ServerClient readyTopLevelEncryption() {
+        // ok message
+        AtomicReference<String> okMessage = new AtomicReference<>();
+
+        // initialize decryption before client encryption
+        networkHandler.withDecryptionProfile(server.topLevelEncryption);
+
         // add handshake handler to client
-        networkHandler.node().childForType(null)
-                .withHandler((handler, node, packet) -> {
-                    // decrypt and store key
+        networkHandler.node().childForType(PacketServerboundPrivateKey.TYPE)
+                .<PacketServerboundPrivateKey>withHandler((handler, node, packet) -> {
+                    // store key
+                    clientEncryptionProfile.withPrivateKey(packet.getKey());
+                    networkHandler.withDecryptionProfile(clientEncryptionProfile);
+
+                    // generate message and send ok packet
+                    Random random = new Random();
+                    byte[] bytes = new byte[256];
+                    for (int i = 0; i < bytes.length; i++)
+                        bytes[i] = (byte)(random.nextInt(120) + 30);
+                    okMessage.set(new String(bytes, StandardCharsets.UTF_8));
+
+                    networkHandler.sendSyncEncrypted(new PacketUnboundHandshakeOk(okMessage.get()), clientEncryptionProfile);
+
+                    return new HandlerNode.Result(ChainAction.CONTINUE)
+                            .nodeAction(NodeAction.REMOVE);
+                });
+
+        // listen to verification
+        networkHandler.node().childForType(PacketUnboundHandshakeOk.TYPE)
+                .<PacketUnboundHandshakeOk>withHandler((handler, node, packet) -> {
+                    if (!(okMessage.get() + "-modified").equals(packet.message)) {
+                        LOGGER.err("RSA encrypted handshake verification failed for {0}", this);
+                        disconnect(DisconnectReason.KICK);
+                    } else {
+                        LOGGER.ok("Verified RSA encrypted handshake for {0}", this);
+                    }
+
+                    // finish encryption
+                    onEncryptionReady();
 
                     return new HandlerNode.Result(ChainAction.CONTINUE)
                             .nodeAction(NodeAction.REMOVE);

@@ -1,4 +1,4 @@
-package net.orbyfied.hscsms.common.protocol;
+package net.orbyfied.hscsms.common.protocol.handshake;
 
 import net.orbyfied.hscsms.network.Packet;
 import net.orbyfied.hscsms.network.PacketType;

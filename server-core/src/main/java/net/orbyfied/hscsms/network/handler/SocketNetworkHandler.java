@@ -4,12 +4,11 @@ import net.orbyfied.hscsms.network.NetworkHandler;
 import net.orbyfied.hscsms.network.NetworkManager;
 import net.orbyfied.hscsms.network.Packet;
 import net.orbyfied.hscsms.network.PacketType;
+import net.orbyfied.hscsms.security.EncryptionProfile;
 import net.orbyfied.hscsms.service.Logging;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import javax.crypto.Cipher;
+import java.io.*;
 import java.net.Socket;
 import java.util.function.Consumer;
 
@@ -29,6 +28,9 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
     // disconnect handler
     Consumer<Throwable> disconnectHandler;
 
+    // decryption profile
+    EncryptionProfile decryptionProfile;
+
     public SocketNetworkHandler(final NetworkManager manager,
                                 final NetworkHandler parent) {
         super(manager, parent);
@@ -44,6 +46,11 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
 
     public SocketNetworkHandler withDisconnectHandler(Consumer<Throwable> consumer) {
         this.disconnectHandler = consumer;
+        return this;
+    }
+
+    public SocketNetworkHandler withDecryptionProfile(EncryptionProfile profile) {
+        this.decryptionProfile = profile;
         return this;
     }
 
@@ -96,10 +103,42 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
     public SocketNetworkHandler sendSync(Packet packet) {
         try {
             // write packet type
+            outputStream.writeByte(/* unencrypted */ 0);
             outputStream.writeInt(packet.type().identifier().hashCode());
 
             // serialize packet
             packet.type().serializer().serialize(packet.type(), packet, outputStream);
+
+            // flush
+            outputStream.flush();
+
+            // return
+            return this;
+        } catch (Throwable t) {
+            t.printStackTrace(Logging.ERR);
+            return this;
+        }
+    }
+
+    public SocketNetworkHandler sendSyncEncrypted(Packet packet, EncryptionProfile encryption) {
+        try {
+            // create output stream
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            DataOutputStream stream = new DataOutputStream(baos);
+
+            // serialize packet
+            packet.type().serializer().serialize(packet.type(), packet, stream);
+
+            // write packet type unencrypted
+            outputStream.writeByte(/* encrypted */ 1);
+            outputStream.writeInt(packet.type().identifier().hashCode());
+
+            // encrypt bytes and write
+            byte[] unencrypted = baos.toByteArray();
+            byte[] encrypted   = encryption.cipherBigData(unencrypted, Cipher.ENCRYPT_MODE);
+
+            outputStream.writeInt(encrypted.length); // write length
+            outputStream.write(encrypted);
 
             // flush
             outputStream.flush();
@@ -140,6 +179,7 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
             try {
                 while (!socket.isClosed() && active.get()) {
                     // listen for incoming packets
+                    byte encryptedFlag   = inputStream.readByte();
                     int packetTypeId = inputStream.readInt();
                     // get packet type
                     PacketType<? extends Packet> packetType =
@@ -150,9 +190,37 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
                         // increment packet count
                         pC++;
 
+                        // prepare stream
+                        DataInputStream stream;
+                        if (encryptedFlag == 0) {
+                            // put unencrypted stream
+                            stream = inputStream;
+                        } else {
+                            // check for decryption profile
+                            if (decryptionProfile == null) {
+                                throw new IllegalArgumentException("can not decrypt encrypted packet, no decryption profile set");
+                            }
+
+                            // read encrypted bytes
+                            int dataLen = inputStream.readInt();
+                            byte[] encrypted = new byte[dataLen];
+                            int read = inputStream.read(encrypted);
+                            if (read == -1) {
+                                throw new IllegalStateException("expected to read " + dataLen + " bytes, read none");
+                            }
+
+                            // decrypt all bytes
+                            byte[] unencrypted = decryptionProfile.cipherBigData(encrypted, Cipher.DECRYPT_MODE);
+
+                            // create input stream
+                            ByteArrayInputStream bais = new ByteArrayInputStream(unencrypted);
+                            stream = new DataInputStream(bais);
+                        }
+
                         // deserialize
                         Packet packet = packetType.deserializer()
-                                .deserialize(packetType, inputStream);
+                                .deserialize(packetType, stream);
+
                         // handle
                         SocketNetworkHandler.this.handle(packet);
                     }

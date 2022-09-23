@@ -39,7 +39,7 @@ public class HandlerNode {
 
     public interface Handler<P extends Packet> {
 
-        Result handle(NetworkHandler handler, HandlerNode node, Packet packet);
+        Result handle(NetworkHandler handler, HandlerNode node, P packet);
 
     }
 
@@ -97,6 +97,7 @@ public class HandlerNode {
         }
     }
 
+    @SuppressWarnings("unchecked")
     public Result handle(NetworkHandler handler, Packet packet) {
         // check
         if (packet == null)
@@ -106,7 +107,7 @@ public class HandlerNode {
         Result result;
 
         // call these handlers
-        for (Handler<? extends Packet> h : handlers) {
+        for (Handler h : handlers) {
             if ((result = h.handle(handler, this, packet)).chain() == ChainAction.HALT)
                 return result;
             if (result.nodeAction() == NodeAction.REMOVE)

@@ -27,8 +27,6 @@ public class EncryptionProfile {
     }
 
     public static KeyFactory getKeyFactorySafe(String str) {
-        if (str.equals("AES"))
-            str = "RSA";
         try {
             return KeyFactory.getInstance(str);
         } catch (NoSuchAlgorithmException e) {
@@ -51,9 +49,9 @@ public class EncryptionProfile {
     }
 
     public static final EncryptionProfile RSA_UTILITY_1024
-            = new EncryptionProfile("RSA", "ECB", "PKCS1Padding", 1024);
+            = new EncryptionProfile("RSA", "ECB", "PKCS1Padding", "RSA", 1024);
     public static final EncryptionProfile AES_UTILITY_128
-            = new EncryptionProfile("AES", "ECB", "PKCS5Padding", 128);
+            = new EncryptionProfile("AES", "ECB", "PKCS5Padding", "RSA", 128);
 
     ////////////////////////////////////////////
 
@@ -67,20 +65,22 @@ public class EncryptionProfile {
 
     // properties
     private String algorithm;
+    private String keyAlgorithm;
     private String mode;
     private String padding;
     private int keyLength;
 
-    public EncryptionProfile(String algorithm, String mode, String padding, int keyLength) {
+    public EncryptionProfile(String algorithm, String mode, String padding, String keyAlgorithm, int keyLength) {
         this(
                 getCipherSafe(algorithm + "/" + mode + "/" + padding),
-                getKeyFactorySafe(algorithm),
+                getKeyFactorySafe(keyAlgorithm),
                 keyLength
         );
 
-        this.algorithm = algorithm;
-        this.mode      = mode;
-        this.padding   = padding;
+        this.algorithm    = algorithm;
+        this.keyAlgorithm = keyAlgorithm;
+        this.mode         = mode;
+        this.padding      = padding;
     }
 
     public EncryptionProfile(Cipher cipher, KeyFactory keyFactory, int keyLength) {
@@ -90,7 +90,8 @@ public class EncryptionProfile {
         this.keyFactory = keyFactory;
         this.keyLength  = keyLength;
 
-        this.algorithm = cipher.getAlgorithm();
+        this.algorithm    = cipher.getAlgorithm();
+        this.keyAlgorithm = keyFactory.getAlgorithm();
     }
 
     public EncryptionProfile generateKeyPair(KeyPairGenerator generator, int len) {
@@ -107,7 +108,7 @@ public class EncryptionProfile {
     }
 
     public EncryptionProfile generateKeyPair(int len) {
-        return generateKeyPair(getKeyPairGenSafe(algorithm), len);
+        return generateKeyPair(getKeyPairGenSafe(keyAlgorithm), len);
     }
 
     public EncryptionProfile withKeyPair(KeyPair pair) {
@@ -265,6 +266,71 @@ public class EncryptionProfile {
             return keyFactory.generatePublic(publicSpec);
         } catch (Exception e) {
             e.printStackTrace(Logging.ERR);
+            return null;
+        }
+    }
+
+    private byte[] baAppend(byte[] arr, byte[] append) {
+        // allocate new array
+        byte[] res = new byte[arr.length + append.length];
+
+        // copy into array
+        System.arraycopy(arr, 0, res, 0, arr.length);
+        System.arraycopy(append, 0, res, arr.length, append.length);
+
+        // return
+        return res;
+    }
+
+    public byte[] cipherBigData(byte[] bytes,
+                                int mode) {
+        try {
+            // initialize mode
+            Key key = getPublicKey();
+            if (key == null)
+                key = getPrivateKey();
+            cipher.init(mode, key);
+
+            // intermediate buffer
+            byte[] intermediate;
+            // final result
+            byte[] result = new byte[0];
+
+            // block size
+            int blockLen = (mode == Cipher.ENCRYPT_MODE) ? 100 : 128;
+            // block buffer
+            byte[] buf = new byte[blockLen];
+
+            // for each byte
+            for (int i = 0; i < bytes.length; i++) {
+                int blockI = i % blockLen;
+
+                // check if we filled our buffer array
+                if (i > 0 && blockI == 0) {
+                    // encrypt buffer
+                    intermediate = cipher.doFinal(buf);
+                    // copy into result buffer
+                    baAppend(result, intermediate);
+
+                    // clear buffer array
+                    int newBlockLen = blockLen;
+                    if (i + blockLen > bytes.length)
+                        newBlockLen = bytes.length - i;
+                    buf = new byte[newBlockLen];
+                }
+
+                // copy byte to buffer
+                buf[blockI] = bytes[i];
+            }
+
+            // append trailing block
+            intermediate = cipher.doFinal(buf);
+            baAppend(result, intermediate);
+
+            // return
+            return result;
+        } catch (Exception e) {
+            e.printStackTrace();
             return null;
         }
     }

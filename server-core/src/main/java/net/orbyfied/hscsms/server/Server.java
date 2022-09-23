@@ -64,7 +64,7 @@ public class Server {
 
     // the top level encryption
     public final EncryptionProfile topLevelEncryption
-            = new EncryptionProfile("RSA", "ECB", "PKCS1Padding", 1024);
+            = ProtocolSpec.newBlankEncryptionProfile();
 
     /* ------ Top-Level Services ------ */
 
