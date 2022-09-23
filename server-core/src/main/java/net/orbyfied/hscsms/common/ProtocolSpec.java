@@ -6,7 +6,7 @@ import net.orbyfied.hscsms.common.protocol.handshake.PacketClientboundPublicKey;
 import net.orbyfied.hscsms.common.protocol.handshake.PacketServerboundClientKey;
 import net.orbyfied.hscsms.common.protocol.handshake.PacketUnboundHandshakeOk;
 import net.orbyfied.hscsms.network.NetworkManager;
-import net.orbyfied.hscsms.security.EncryptionProfile;
+import net.orbyfied.hscsms.security.LegacyEncryptionProfile;
 
 public class ProtocolSpec {
 
@@ -30,17 +30,17 @@ public class ProtocolSpec {
     /* ------------------- */
 
     public static final int G_KEY_LENGTH = 1024;
-    public static final int S_KEY_LENGTH = 56;
+    public static final int S_KEY_LENGTH = 128;
 
-    public static EncryptionProfile newBlankEncryptionProfile() {
-        return new EncryptionProfile("RSA", "ECB", "PKCS1Padding", "RSA", G_KEY_LENGTH);
+    public static LegacyEncryptionProfile newBlankEncryptionProfile() {
+        return new LegacyEncryptionProfile("RSA", "ECB", "PKCS1Padding", "RSA", "RSA", G_KEY_LENGTH);
     }
 
-    public static EncryptionProfile newSymmetricSecretProfile() {
-        return new EncryptionProfile("AES", "ECB", "NoPadding", "DES", S_KEY_LENGTH);
+    public static LegacyEncryptionProfile newSymmetricSecretProfile() {
+        return new LegacyEncryptionProfile("AES", "ECB", "PKCS5Padding", "DES", "AES", S_KEY_LENGTH);
     }
 
-    public static final EncryptionProfile EP_UTILITY = newBlankEncryptionProfile();
-    public static final EncryptionProfile EP_SECRET  = newSymmetricSecretProfile();
+    public static final LegacyEncryptionProfile EP_UTILITY = newBlankEncryptionProfile();
+    public static final LegacyEncryptionProfile EP_SECRET  = newSymmetricSecretProfile();
 
 }

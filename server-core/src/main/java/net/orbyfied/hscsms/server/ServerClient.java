@@ -11,7 +11,7 @@ import net.orbyfied.hscsms.network.handler.HandlerNode;
 import net.orbyfied.hscsms.network.handler.NodeAction;
 import net.orbyfied.hscsms.network.handler.SocketNetworkHandler;
 import net.orbyfied.hscsms.common.protocol.DisconnectReason;
-import net.orbyfied.hscsms.security.EncryptionProfile;
+import net.orbyfied.hscsms.security.LegacyEncryptionProfile;
 import net.orbyfied.hscsms.server.resource.User;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.hscsms.util.Values;
@@ -22,6 +22,7 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -41,7 +42,7 @@ public class ServerClient {
     // the network handler
     SocketNetworkHandler networkHandler;
     // the client encryption profile
-    EncryptionProfile clientEncryptionProfile =
+    LegacyEncryptionProfile clientEncryptionProfile =
             ProtocolSpec.newSymmetricSecretProfile();
 
     // the user this client has authenticated as
@@ -160,10 +161,10 @@ public class ServerClient {
 
                     // generate message and send ok packet
                     Random random = new Random();
-                    byte[] bytes = new byte[256];
+                    byte[] bytes = new byte[16];
                     for (int i = 0; i < bytes.length; i++)
                         bytes[i] = (byte)(random.nextInt(120) + 30);
-                    okMessage.set(new String(bytes, StandardCharsets.UTF_8));
+                    okMessage.set(Base64.getEncoder().encodeToString(bytes));
 
                     networkHandler.sendSyncEncrypted(new PacketUnboundHandshakeOk(okMessage.get()), clientEncryptionProfile);
 

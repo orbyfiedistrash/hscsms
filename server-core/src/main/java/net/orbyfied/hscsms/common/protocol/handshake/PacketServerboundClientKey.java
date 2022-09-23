@@ -18,13 +18,11 @@ public class PacketServerboundClientKey extends Packet {
                     .serializer((type, packet, stream) -> {
                         // encode key and write
                         String key = EP_UTILITY.encodeSecretKey(packet.getKey());
-                        System.out.println("SEC-KEY: " + key);
                         stream.writeUTF(key);
                     })
                     .deserializer((type, stream) -> {
                         // read and decode key
                         String keyStr = stream.readUTF();
-                        System.out.println("SEC-KEY: " + keyStr);
                         SecretKey key = EP_SECRET.decodeSecretKey(keyStr);
                         return new PacketServerboundClientKey(key);
                     });

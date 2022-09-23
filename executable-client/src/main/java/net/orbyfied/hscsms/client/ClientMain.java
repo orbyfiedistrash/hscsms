@@ -15,7 +15,7 @@ import net.orbyfied.hscsms.network.handler.ChainAction;
 import net.orbyfied.hscsms.network.handler.HandlerNode;
 import net.orbyfied.hscsms.network.handler.NodeAction;
 import net.orbyfied.hscsms.network.handler.SocketNetworkHandler;
-import net.orbyfied.hscsms.security.EncryptionProfile;
+import net.orbyfied.hscsms.security.LegacyEncryptionProfile;
 import net.orbyfied.hscsms.server.ServerClient;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.hscsms.util.Values;
@@ -24,6 +24,7 @@ import net.orbyfied.j8.util.logging.Logger;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.Scanner;
 
 public class ClientMain {
@@ -49,9 +50,9 @@ public class ClientMain {
     public SocketNetworkHandler networkHandler =
             new SocketNetworkHandler(networkManager, null);
 
-    public final EncryptionProfile serverEncryptionProfile =
+    public final LegacyEncryptionProfile serverEncryptionProfile =
             ProtocolSpec.newBlankEncryptionProfile();
-    private final EncryptionProfile clientEncryptionProfile =
+    private final LegacyEncryptionProfile clientEncryptionProfile =
             ProtocolSpec.newSymmetricSecretProfile();
 
     /**
@@ -87,7 +88,7 @@ public class ClientMain {
 
                     // generate private key
                     clientEncryptionProfile.generateSymmetricKey();
-
+                    
                     // send serverbound private key packet, encrypted
                     networkHandler.sendSyncEncrypted(
                             new PacketServerboundClientKey(clientEncryptionProfile.getSecretKey()),
@@ -167,6 +168,7 @@ public class ClientMain {
         try {
             argVals = new ArgParser()
                     .withArgument("work-dir", Path.class)
+                    .withArgument("connect", String.class)
                     .parseConsoleArgs(args);
         } catch (ArgParseException e) {
             System.err.println("Error ArgParser: " + e.getMessage());
@@ -188,7 +190,14 @@ public class ClientMain {
         Scanner scanner = new Scanner(System.in);
 
         // input address
-        String[] addr = scanner.nextLine().split(":");
+        String addrln;
+        if (argVals.contains("connect")) {
+            addrln = argVals.get("connect");
+        } else {
+            addrln = scanner.nextLine();
+        }
+
+        String[] addr = addrln.split(":");
         String host = addr[0];
         if (host.equals("localhost") || host.isBlank())
             host = "0.0.0.0";

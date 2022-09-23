@@ -10,7 +10,7 @@ import net.orbyfied.hscsms.db.Login;
 import net.orbyfied.hscsms.db.impl.MongoDatabase;
 import net.orbyfied.hscsms.network.NetworkManager;
 import net.orbyfied.hscsms.network.handler.UtilityNetworkHandler;
-import net.orbyfied.hscsms.security.EncryptionProfile;
+import net.orbyfied.hscsms.security.LegacyEncryptionProfile;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.hscsms.util.SafeWorker;
 import net.orbyfied.hscsms.util.Values;
@@ -63,7 +63,7 @@ public class Server {
     /* ------ Security ----- */
 
     // the top level encryption
-    public final EncryptionProfile topLevelEncryption
+    public final LegacyEncryptionProfile topLevelEncryption
             = ProtocolSpec.newBlankEncryptionProfile();
 
     /* ------ Top-Level Services ------ */
