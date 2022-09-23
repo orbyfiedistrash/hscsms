@@ -6,7 +6,7 @@ import net.orbyfied.hscsms.client.applib.impl.ExitAC;
 import net.orbyfied.hscsms.common.ProtocolSpec;
 import net.orbyfied.hscsms.common.protocol.handshake.PacketClientboundPublicKey;
 import net.orbyfied.hscsms.common.protocol.PacketServerboundDisconnect;
-import net.orbyfied.hscsms.common.protocol.handshake.PacketServerboundPrivateKey;
+import net.orbyfied.hscsms.common.protocol.handshake.PacketServerboundClientKey;
 import net.orbyfied.hscsms.common.protocol.handshake.PacketUnboundHandshakeOk;
 import net.orbyfied.hscsms.libexec.ArgParseException;
 import net.orbyfied.hscsms.libexec.ArgParser;
@@ -52,7 +52,7 @@ public class ClientMain {
     public final EncryptionProfile serverEncryptionProfile =
             ProtocolSpec.newBlankEncryptionProfile();
     private final EncryptionProfile clientEncryptionProfile =
-            ProtocolSpec.newBlankEncryptionProfile();
+            ProtocolSpec.newSymmetricSecretProfile();
 
     /**
      * The working directory.
@@ -86,13 +86,16 @@ public class ClientMain {
                     networkHandler.withDecryptionProfile(serverEncryptionProfile);
 
                     // generate private key
-                    clientEncryptionProfile.generateKeyPair(1024);
+                    clientEncryptionProfile.generateSymmetricKey();
 
                     // send serverbound private key packet, encrypted
                     networkHandler.sendSyncEncrypted(
-                            new PacketServerboundPrivateKey(clientEncryptionProfile.getPrivateKey()),
+                            new PacketServerboundClientKey(clientEncryptionProfile.getSecretKey()),
                             serverEncryptionProfile
                     );
+
+                    // use new decryption profile
+                    networkHandler.withDecryptionProfile(clientEncryptionProfile);
 
                     // return and remove this node
                     return new HandlerNode.Result(ChainAction.CONTINUE)
@@ -187,6 +190,8 @@ public class ClientMain {
         // input address
         String[] addr = scanner.nextLine().split(":");
         String host = addr[0];
+        if (host.equals("localhost") || host.isBlank())
+            host = "0.0.0.0";
         int port = 42069;
         if (addr.length > 1)
             port = Integer.parseInt(addr[1]);

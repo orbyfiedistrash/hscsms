@@ -1,8 +1,10 @@
 package net.orbyfied.hscsms.common.protocol.handshake;
 
+import net.orbyfied.hscsms.common.ProtocolSpec;
 import net.orbyfied.hscsms.network.Packet;
 import net.orbyfied.hscsms.network.PacketType;
 import net.orbyfied.hscsms.security.EncryptionProfile;
+import static net.orbyfied.hscsms.common.ProtocolSpec.EP_UTILITY;
 
 import java.security.PublicKey;
 
@@ -12,13 +14,15 @@ public class PacketClientboundPublicKey extends Packet {
             new PacketType<>(PacketClientboundPublicKey.class, "hscsms/handshake/clientbound/pubkey")
             .serializer((type, packet, stream) -> {
                 // encode key and write
-                String key = EncryptionProfile.RSA_UTILITY_1024.encodePublicKey(packet.key);
+                String key = EP_UTILITY.encodePublicKey(packet.key);
+                System.out.println("SERVER-PUB-KEY: " + key);
                 stream.writeUTF(key);
             })
             .deserializer((type, stream) -> {
                 // read and decode key
                 String keyStr = stream.readUTF();
-                PublicKey key = EncryptionProfile.RSA_UTILITY_1024.decodePublicKey(keyStr);
+                System.out.println("SERVER-PUB-KEY: " + keyStr);
+                PublicKey key = EP_UTILITY.decodePublicKey(keyStr);
                 return new PacketClientboundPublicKey(key);
             });
 

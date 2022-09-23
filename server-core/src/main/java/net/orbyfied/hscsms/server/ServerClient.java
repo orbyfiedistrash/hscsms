@@ -4,7 +4,7 @@ import net.orbyfied.hscsms.common.ProtocolSpec;
 import net.orbyfied.hscsms.common.protocol.PacketClientboundDisconnect;
 import net.orbyfied.hscsms.common.protocol.handshake.PacketClientboundPublicKey;
 import net.orbyfied.hscsms.common.protocol.PacketServerboundDisconnect;
-import net.orbyfied.hscsms.common.protocol.handshake.PacketServerboundPrivateKey;
+import net.orbyfied.hscsms.common.protocol.handshake.PacketServerboundClientKey;
 import net.orbyfied.hscsms.common.protocol.handshake.PacketUnboundHandshakeOk;
 import net.orbyfied.hscsms.network.handler.ChainAction;
 import net.orbyfied.hscsms.network.handler.HandlerNode;
@@ -42,7 +42,7 @@ public class ServerClient {
     SocketNetworkHandler networkHandler;
     // the client encryption profile
     EncryptionProfile clientEncryptionProfile =
-            ProtocolSpec.newBlankEncryptionProfile();
+            ProtocolSpec.newSymmetricSecretProfile();
 
     // the user this client has authenticated as
     // this is null at first
@@ -152,10 +152,10 @@ public class ServerClient {
         networkHandler.withDecryptionProfile(server.topLevelEncryption);
 
         // add handshake handler to client
-        networkHandler.node().childForType(PacketServerboundPrivateKey.TYPE)
-                .<PacketServerboundPrivateKey>withHandler((handler, node, packet) -> {
+        networkHandler.node().childForType(PacketServerboundClientKey.TYPE)
+                .<PacketServerboundClientKey>withHandler((handler, node, packet) -> {
                     // store key
-                    clientEncryptionProfile.withPrivateKey(packet.getKey());
+                    clientEncryptionProfile.withSecretKey(packet.getKey());
                     networkHandler.withDecryptionProfile(clientEncryptionProfile);
 
                     // generate message and send ok packet

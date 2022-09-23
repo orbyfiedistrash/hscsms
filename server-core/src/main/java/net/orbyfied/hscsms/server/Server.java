@@ -133,7 +133,7 @@ public class Server {
 
         // generate top level key pair
         try {
-            topLevelEncryption.generateKeyPair(1024);
+            topLevelEncryption.generateAsymmetricKeyPair();
             logger.ok("Generated top level RSA key pair");
         } catch (Exception e) {
             logger.err("Failed to generate top level RSA key pair");

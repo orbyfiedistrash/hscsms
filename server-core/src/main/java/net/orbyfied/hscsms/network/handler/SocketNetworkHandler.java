@@ -49,7 +49,7 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
         return this;
     }
 
-    public SocketNetworkHandler withDecryptionProfile(EncryptionProfile profile) {
+    public synchronized SocketNetworkHandler withDecryptionProfile(EncryptionProfile profile) {
         this.decryptionProfile = profile;
         return this;
     }
@@ -210,6 +210,7 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
                             }
 
                             // decrypt all bytes
+                            System.out.println("TYPE: " + packetType.identifier());
                             byte[] unencrypted = decryptionProfile.cipherBigData(encrypted, Cipher.DECRYPT_MODE);
 
                             // create input stream

@@ -2,8 +2,8 @@ package net.orbyfied.hscsms.security;
 
 import net.orbyfied.hscsms.service.Logging;
 
-import javax.crypto.Cipher;
-import javax.crypto.NoSuchPaddingException;
+import javax.crypto.*;
+import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.spec.PKCS8EncodedKeySpec;
@@ -29,10 +29,15 @@ public class EncryptionProfile {
     public static KeyFactory getKeyFactorySafe(String str) {
         try {
             return KeyFactory.getInstance(str);
-        } catch (NoSuchAlgorithmException e) {
-            System.err.println("Unknown key factory (algorithm): " + str);
-            e.printStackTrace(Logging.ERR);
-        }
+        } catch (NoSuchAlgorithmException ignored) { }
+
+        return null;
+    }
+
+    public static SecretKeyFactory getSecretKeyFactorySafe(String str) {
+        try {
+            return SecretKeyFactory.getInstance(str);
+        } catch (NoSuchAlgorithmException ignored) { }
 
         return null;
     }
@@ -40,6 +45,17 @@ public class EncryptionProfile {
     public static KeyPairGenerator getKeyPairGenSafe(String str) {
         try {
             return KeyPairGenerator.getInstance(str);
+        } catch (NoSuchAlgorithmException e) {
+            System.err.println("Unknown key pair gen (algorithm): " + str);
+            e.printStackTrace(Logging.ERR);
+        }
+
+        return null;
+    }
+
+    public static KeyGenerator getKeyGenSafe(String str) {
+        try {
+            return KeyGenerator.getInstance(str);
         } catch (NoSuchAlgorithmException e) {
             System.err.println("Unknown key pair gen (algorithm): " + str);
             e.printStackTrace(Logging.ERR);
@@ -58,10 +74,12 @@ public class EncryptionProfile {
     // the key pair
     private PublicKey  publicKey;
     private PrivateKey privateKey;
+    private SecretKey  secretKey;
 
     // the cipher and key factory
     private Cipher cipher;
     private KeyFactory keyFactory;
+    private SecretKeyFactory secretKeyFactory;
 
     // properties
     private String algorithm;
@@ -74,6 +92,7 @@ public class EncryptionProfile {
         this(
                 getCipherSafe(algorithm + "/" + mode + "/" + padding),
                 getKeyFactorySafe(keyAlgorithm),
+                getSecretKeyFactorySafe(keyAlgorithm),
                 keyLength
         );
 
@@ -83,18 +102,21 @@ public class EncryptionProfile {
         this.padding      = padding;
     }
 
-    public EncryptionProfile(Cipher cipher, KeyFactory keyFactory, int keyLength) {
-        if (cipher == null || keyFactory == null)
+    public EncryptionProfile(Cipher cipher, KeyFactory keyFactory,
+                             SecretKeyFactory secretKeyFactory, int keyLength) {
+        if (cipher == null)
             throw new IllegalArgumentException();
-        this.cipher     = cipher;
+        this.cipher = cipher;
+
         this.keyFactory = keyFactory;
+        this.secretKeyFactory = secretKeyFactory;
         this.keyLength  = keyLength;
 
         this.algorithm    = cipher.getAlgorithm();
-        this.keyAlgorithm = keyFactory.getAlgorithm();
+        this.keyAlgorithm = (keyFactory != null ? keyFactory.getAlgorithm() : secretKeyFactory.getAlgorithm());
     }
 
-    public EncryptionProfile generateKeyPair(KeyPairGenerator generator, int len) {
+    public EncryptionProfile generateAsymmetricKeyPair(KeyPairGenerator generator, int len) {
         try {
             generator.initialize(len);
             KeyPair pair = generator.generateKeyPair();
@@ -107,8 +129,31 @@ public class EncryptionProfile {
         }
     }
 
-    public EncryptionProfile generateKeyPair(int len) {
-        return generateKeyPair(getKeyPairGenSafe(keyAlgorithm), len);
+    public EncryptionProfile generateAsymmetricKeyPair(int len) {
+        return generateAsymmetricKeyPair(getKeyPairGenSafe(keyAlgorithm), len);
+    }
+
+    public EncryptionProfile generateAsymmetricKeyPair() {
+        return generateAsymmetricKeyPair(getKeyPairGenSafe(keyAlgorithm), keyLength);
+    }
+
+    public EncryptionProfile generateSymmetricKey(KeyGenerator generator, int len) {
+        try {
+            generator.init(len);
+            this.secretKey = generator.generateKey();
+            return this;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return this;
+        }
+    }
+
+    public EncryptionProfile generateSymmetricKey(int len) {
+        return generateSymmetricKey(getKeyGenSafe(keyAlgorithm), len);
+    }
+
+    public EncryptionProfile generateSymmetricKey() {
+        return generateSymmetricKey(keyLength);
     }
 
     public EncryptionProfile withKeyPair(KeyPair pair) {
@@ -149,6 +194,10 @@ public class EncryptionProfile {
         return privateKey;
     }
 
+    public SecretKey getSecretKey() {
+        return secretKey;
+    }
+
     public EncryptionProfile withPublicKey(PublicKey key) {
         this.publicKey = key;
         return this;
@@ -156,6 +205,11 @@ public class EncryptionProfile {
 
     public EncryptionProfile withPrivateKey(PrivateKey key) {
         this.privateKey = privateKey;
+        return this;
+    }
+
+    public EncryptionProfile withSecretKey(SecretKey key) {
+        this.secretKey = key;
         return this;
     }
 
@@ -229,6 +283,14 @@ public class EncryptionProfile {
         return Base64.getEncoder().encodeToString(privateKey.getEncoded());
     }
 
+    public String encodeSecretKey(SecretKey key) {
+        return toBase64(key.getEncoded());
+    }
+
+    public String encodeSecretKey() {
+        return toBase64(secretKey.getEncoded());
+    }
+
     public EncryptionProfile loadKeys(String priv, String pub) {
         loadPublicKey(pub);
         loadPrivateKey(priv);
@@ -270,6 +332,17 @@ public class EncryptionProfile {
         }
     }
 
+    public SecretKey decodeSecretKey(String str) {
+        try {
+            byte[] keyBytes = fromBase64(str);
+            SecretKeySpec spec = new SecretKeySpec(keyBytes, algorithm);
+            return secretKeyFactory.generateSecret(spec);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
     private byte[] baAppend(byte[] arr, byte[] append) {
         // allocate new array
         byte[] res = new byte[arr.length + append.length];
@@ -283,7 +356,30 @@ public class EncryptionProfile {
     }
 
     public byte[] cipherBigData(byte[] bytes,
-                                int mode) {
+                                int mode){
+        return switch (algorithm) {
+            case "RSA" -> cipherBigDataRSA(bytes, mode);
+            case "AES" -> cipherBigDataAES(bytes, mode);
+            default -> { throw new IllegalStateException("Unknown algorithm: " + algorithm); }
+        };
+    }
+
+    public byte[] cipherBigDataAES(byte[] bytes,
+                                   int mode) {
+        try {
+            // initialize mode
+            cipher.init(mode, getSecretKey());
+
+            // do final
+            return cipher.doFinal(bytes);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public byte[] cipherBigDataRSA(byte[] bytes,
+                                   int mode) {
         try {
             // initialize mode
             Key key = getPublicKey();
