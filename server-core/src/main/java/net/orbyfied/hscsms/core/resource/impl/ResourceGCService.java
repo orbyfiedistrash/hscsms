@@ -32,7 +32,7 @@ public class ResourceGCService extends AbstractResourceService {
 
     // if the garbage collector should automatically track
     // resource usages and act on them
-    boolean automate;
+    boolean automate = true;
 
     // the internal map for tracking which
     // resources are currently being used
@@ -85,7 +85,12 @@ public class ResourceGCService extends AbstractResourceService {
      */
     public void acquireImmediate(ServerResource resource) {
         // increment usage
-        usages.get(resource).value++;
+        IntBox u = usages.get(resource);
+        if (u == null) {
+            u = new IntBox();
+            usages.put(resource, u);
+        }
+        u.value++;
     }
 
     /**
@@ -93,12 +98,22 @@ public class ResourceGCService extends AbstractResourceService {
      * @param resource The resource.
      */
     public void releaseImmediate(ServerResource resource) {
-        // decrement usage
+        // get counter from map
         IntBox u = usages.get(resource);
-        u.value--;
+        boolean dispose = false;
+        if (u != null) {
+            // decrement usage
+            u.value--;
+            // check if we should dispose
+            if (u.value <= 0)
+                dispose = true;
+        } else {
+            // always dispose if its not in the map
+            dispose = true;
+        }
 
-        // check if we should dispose
-        if (u.value <= 0)
+        // dispose if needed
+        if (dispose)
             disposeImmediate(resource);
     }
 

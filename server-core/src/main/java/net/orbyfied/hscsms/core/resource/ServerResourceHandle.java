@@ -3,6 +3,7 @@ package net.orbyfied.hscsms.core.resource;
 import java.lang.ref.WeakReference;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 public class ServerResourceHandle<R extends ServerResource> {
 
@@ -14,6 +15,8 @@ public class ServerResourceHandle<R extends ServerResource> {
     // the loaded resource if loaded
     // or null if unloaded
     WeakReference<R> resource;
+    // if the resource has been acquired
+    volatile boolean acquired = false;
 
     public ServerResourceHandle(ServerResourceManager manager, UUID uuid) {
         this.manager = manager;
@@ -45,6 +48,16 @@ public class ServerResourceHandle<R extends ServerResource> {
     /* ----------------- */
 
     /**
+     * Check if the universal ID is
+     * a null resource ID.
+     * @see ServerResourceManager#NULL_ID
+     * @return True if it is a NULL_ID.
+     */
+    public boolean isNullID() {
+        return ServerResourceManager.NULL_ID.equals(uuid);
+    }
+
+    /**
      * Get the loaded resource, or null
      * if the resource is unloaded.
      * @return The resource or null.
@@ -65,7 +78,7 @@ public class ServerResourceHandle<R extends ServerResource> {
     public R getOrLoad() {
         // check loaded, if not load
         if (resource == null || resource.get() == null)
-            resource = new WeakReference<>(manager.loadResource(uuid));
+            resource = new WeakReference<>(manager.loadResourceUnwrapped(uuid));
         // return already loaded
         return resource.get();
     }
@@ -80,7 +93,7 @@ public class ServerResourceHandle<R extends ServerResource> {
         if (resource == null || resource.get() == null) {
             return CompletableFuture.supplyAsync(() -> {
                 // load the resource
-                R res = manager.loadResource(uuid);
+                R res = manager.loadResourceUnwrapped(uuid);
                 // set resource reference
                 synchronized (resource) {
                     resource = new WeakReference<>((R) res);
@@ -99,12 +112,61 @@ public class ServerResourceHandle<R extends ServerResource> {
     }
 
     /**
+     * Provides the resource to the consumer if
+     * loaded, or doesn't call the consumer if not.
+     * @param consumer The consumer.
+     * @return This.
+     */
+    public ServerResourceHandle<R> useOrNot(Consumer<R> consumer) {
+        R resource = getOrNull();
+        if (resource != null)
+            consumer.accept(resource);
+        return this;
+    }
+
+    /**
+     * Provides the resource to the consumer if
+     * loaded, or calls it with null if not.
+     * @param consumer The consumer.
+     * @return This.
+     */
+    public ServerResourceHandle<R> useOrNull(Consumer<R> consumer) {
+        R resource = getOrNull();
+        consumer.accept(resource);
+        return this;
+    }
+
+    /**
+     * Provides the resource to the consumer if
+     * loaded, loads it and calls it if not loaded.
+     * @param consumer The consumer.
+     * @return This.
+     */
+    public ServerResourceHandle<R> useOrLoad(Consumer<R> consumer) {
+        R resource = getOrLoad();
+        consumer.accept(resource);
+        return this;
+    }
+
+    /**
      * @see ServerResourceHandle#acquire()
      * @see ServerResourceHandle#getOrNull()
      * @return The loaded resource or null.
      */
     public R acquireAndGet() {
         return acquire().getOrNull();
+    }
+
+    /**
+     * @see ServerResourceHandle#acquire()
+     * @see ServerResourceHandle#getOrNull()
+     * @return The loaded resource or null.
+     */
+    public ServerResourceHandle<R> acquireAndUse(Consumer<R> consumer) {
+        R resource = acquire().getOrNull();
+        if (consumer != null)
+            consumer.accept(resource);
+        return this;
     }
 
     /**
@@ -116,8 +178,14 @@ public class ServerResourceHandle<R extends ServerResource> {
      * @return This.
      */
     public ServerResourceHandle<R> acquire() {
-        // call into manager
-        manager.doHandleAcquire(this);
+        // check if acquired
+        if (!acquired) {
+            // call into manager
+            manager.doHandleAcquire(this);
+
+            // set acquired
+            acquired = true;
+        }
 
         // return
         return this;
@@ -134,8 +202,14 @@ public class ServerResourceHandle<R extends ServerResource> {
      * @return This.
      */
     public ServerResourceHandle<R> release() {
-        // call into manager
-        manager.doHandleRelease(this);
+        // check if acquired
+        if (acquired) {
+            // call into manager
+            manager.doHandleRelease(this);
+
+            // set released
+            acquired = false;
+        }
 
         // return
         return this;

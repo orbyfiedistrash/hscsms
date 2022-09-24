@@ -1,9 +1,11 @@
 package net.orbyfied.hscsms;
 
+import net.orbyfied.hscsms.core.resource.ServerResourceHandle;
 import net.orbyfied.hscsms.libexec.ArgParseException;
 import net.orbyfied.hscsms.libexec.ArgParser;
 import net.orbyfied.hscsms.libexec.YamlConfig;
 import net.orbyfied.hscsms.server.Server;
+import net.orbyfied.hscsms.server.resource.User;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.hscsms.util.Values;
 import net.orbyfied.j8.util.logging.Logger;
@@ -68,6 +70,14 @@ public class ServerMain {
 
         // await a worker to block until the server stops
         server.serverSocketWorker.await();
+    }
+
+    private static void sleep(int ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
 }

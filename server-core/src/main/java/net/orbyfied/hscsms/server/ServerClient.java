@@ -7,6 +7,7 @@ import net.orbyfied.hscsms.common.protocol.PacketServerboundDisconnect;
 import net.orbyfied.hscsms.common.protocol.handshake.PacketServerboundClientKey;
 import net.orbyfied.hscsms.common.protocol.handshake.PacketUnboundHandshakeOk;
 import net.orbyfied.hscsms.common.protocol.login.PacketServerboundCreateUser;
+import net.orbyfied.hscsms.core.resource.ServerResourceHandle;
 import net.orbyfied.hscsms.network.handler.ChainAction;
 import net.orbyfied.hscsms.network.handler.HandlerNode;
 import net.orbyfied.hscsms.network.handler.NodeAction;
@@ -252,9 +253,11 @@ public class ServerClient {
                 return UserCreateResult.fail("invalid_username");
 
             // create user resource
-            User user = server.resourceManager().createResource(User.TYPE);
-            user.setUsername(username);
-            user.setPasswordLocal(password);
+            ServerResourceHandle<User> userHandle = server.resourceManager().createResource(User.TYPE);
+            userHandle.useOrNot(user -> {
+                user.setUsername(username);
+                user.setPasswordLocal(password);
+            });
 
             // log and return success
             LOGGER.info("{0} created user " + user.universalID() + "('" + username + "')");

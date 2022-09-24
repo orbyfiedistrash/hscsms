@@ -11,6 +11,7 @@ import net.orbyfied.hscsms.core.resource.event.ResourceCreateEvent;
 import net.orbyfied.hscsms.core.resource.event.ResourceHandleAcquireEvent;
 import net.orbyfied.hscsms.core.resource.event.ResourceHandleReleaseEvent;
 import net.orbyfied.hscsms.core.resource.event.ResourceUnloadEvent;
+import net.orbyfied.hscsms.core.resource.impl.ResourceGCService;
 import net.orbyfied.hscsms.db.Database;
 import net.orbyfied.hscsms.db.DatabaseItem;
 import net.orbyfied.hscsms.db.DatabaseType;
@@ -69,6 +70,9 @@ public class ServerResourceManager {
 
         // create global query pool
         globalQueryPool = server.databaseManager().queryPool();
+
+        // add garbage collection service
+        withService(ResourceGCService::new);
     }
 
     // the server
@@ -108,6 +112,7 @@ public class ServerResourceManager {
     public ServerResourceManager withService(ResourceService service) {
         services.add(service);
         servicesByClass.put(service.getClass(), service);
+        service.added();
         return this;
     }
 
@@ -131,6 +136,7 @@ public class ServerResourceManager {
     public ServerResourceManager withoutService(ResourceService service) {
         services.remove(service);
         servicesByClass.remove(service.getClass(), service);
+        service.removed();
         return this;
     }
 
@@ -216,6 +222,14 @@ public class ServerResourceManager {
 
     /* ---- Resources ---- */
 
+    public boolean isLoaded(ServerResource resource) {
+        return resourcesByUUID.containsKey(resource.universalID());
+    }
+
+    public boolean isLoaded(UUID uuid) {
+        return resourcesByUUID.containsKey(uuid);
+    }
+
     public ServerResourceManager addLoaded(ServerResource resource) {
         resourcesByUUID.put(resource.universalID(), resource);
         resourcesByLID.put(getMemoryMapLocalKey(resource), resource);
@@ -252,15 +266,7 @@ public class ServerResourceManager {
         );
     }
 
-    /**
-     * Creates a new resource of type {@code type}
-     * with a unique universal and local ID, and
-     * registers it to the loaded resources.
-     * @param type The resource type.
-     * @param <R> The resource object class.
-     * @return The resource.
-     */
-    public <R extends ServerResource> R createResource(ServerResourceType<R> type) {
+    public <R extends ServerResource> R createResourceUnwrapped(ServerResourceType<R> type) {
         // generate ids
         UUID uuid    = createUniversalID();
         UUID localId = type.createLocalID();
@@ -275,18 +281,19 @@ public class ServerResourceManager {
     }
 
     /**
-     * Loads a resource using the universal ID, first
-     * checking if it has already been loaded, if not,
-     * it will retrieve the data from the database,
-     * resolve the type and load the data by calling
-     * {@link ServerResourceType#loadResourceSafe(ServerResourceManager, DatabaseItem, ServerResource)}
-     *
-     * @param uuid The universal ID.
-     * @param <R> The resource class.
-     * @return The resource or null if absent.
+     * Creates a new resource of type {@code type}
+     * with a unique universal and local ID, and
+     * registers it to the loaded resources.
+     * @param type The resource type.
+     * @param <R> The resource object class.
+     * @return The resource.
      */
+    public <R extends ServerResource> ServerResourceHandle<R> createResource(ServerResourceType<R> type) {
+        return createHandleLoaded(createResourceUnwrapped(type));
+    }
+
     @SuppressWarnings("unchecked")
-    public <R extends ServerResource> R loadResource(UUID uuid) {
+    public <R extends ServerResource> R loadResourceUnwrapped(UUID uuid) {
         // try and index cache
         ServerResource res;
         if ((res = getLoadedUniversal(uuid)) != null)
@@ -319,6 +326,21 @@ public class ServerResourceManager {
     }
 
     /**
+     * Loads a resource using the universal ID, first
+     * checking if it has already been loaded, if not,
+     * it will retrieve the data from the database,
+     * resolve the type and load the data by calling
+     * {@link ServerResourceType#loadResourceSafe(ServerResourceManager, DatabaseItem, ServerResource)}
+     *
+     * @param uuid The universal ID.
+     * @param <R> The resource class.
+     * @return The resource or null if absent.
+     */
+    public <R extends ServerResource> ServerResourceHandle<R> loadResource(UUID uuid) {
+       return createHandleLoaded(loadResourceUnwrapped(uuid));
+    }
+
+    /**
      * Loads a resource using the type and local ID,
      * it first checks if the resource has already been
      * loaded, if not, it will call {@link ServerResourceType#loadResourceLocal(ServerResourceManager, UUID)}
@@ -328,12 +350,12 @@ public class ServerResourceManager {
      * @return The resource or null if absent.
      */
     @SuppressWarnings("unchecked")
-    public <R extends ServerResource> R loadResourceLocal(ServerResourceType<R> type,
-                                                          UUID localId) {
+    public <R extends ServerResource> ServerResourceHandle<R> loadResourceLocal(ServerResourceType<R> type,
+                                                                                UUID localId) {
         ServerResource resource;
         if ((resource = getLoadedLocal(type, localId)) != null)
-            return (R) resource;
-        return type.loadResourceLocal(this, localId);
+            return createHandleLoaded((R) resource);
+        return createHandleLoaded(type.loadResourceLocal(this, localId));
     }
 
     /**
@@ -403,7 +425,7 @@ public class ServerResourceManager {
      * Loads a resource asynchronously.
      * @see ServerResourceManager#loadResource(UUID)
      */
-    public <R extends ServerResource> CompletableFuture<R> loadResourceAsync(final UUID uuid) {
+    public <R extends ServerResource> CompletableFuture<ServerResourceHandle<R>> loadResourceAsync(final UUID uuid) {
         return CompletableFuture.supplyAsync(() -> loadResource(uuid));
     }
 
@@ -411,8 +433,8 @@ public class ServerResourceManager {
      * Loads a resource by local ID asynchronously.
      * @see ServerResourceManager#loadResourceLocal(ServerResourceType, UUID)
      */
-    public <R extends ServerResource> CompletableFuture<R> loadResourceLocalAsync(final ServerResourceType<R> type,
-                                                                                  final UUID localId) {
+    public <R extends ServerResource> CompletableFuture<ServerResourceHandle<R>> loadResourceLocalAsync(final ServerResourceType<R> type,
+                                                                                                        final UUID localId) {
         return CompletableFuture.supplyAsync(() -> loadResourceLocal(type, localId));
     }
 
@@ -431,7 +453,7 @@ public class ServerResourceManager {
         return resource.universalID();
     }
 
-    public <R extends ServerResource> R loadResourceReferenceSync(final UUID uuid) {
+    public <R extends ServerResource> ServerResourceHandle<R> loadResourceReferenceSync(final UUID uuid) {
         if (uuid.equals(NULL_ID))
             return null;
         return loadResource(uuid);
