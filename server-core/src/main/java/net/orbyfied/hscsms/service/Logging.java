@@ -1,7 +1,7 @@
 package net.orbyfied.hscsms.service;
 
-import net.orbyfied.hscsms.util.LoopWorker;
-import net.orbyfied.hscsms.util.SafeWorker;
+import net.orbyfied.hscsms.util.worker.LoopWorker;
+import net.orbyfied.hscsms.util.worker.SafeWorker;
 import net.orbyfied.j8.util.logging.LogHandler;
 import net.orbyfied.j8.util.logging.LogText;
 import net.orbyfied.j8.util.logging.Logger;

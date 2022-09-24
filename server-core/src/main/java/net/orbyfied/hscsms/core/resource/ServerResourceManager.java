@@ -1,11 +1,16 @@
 package net.orbyfied.hscsms.core.resource;
 
+import com.mongodb.Function;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import net.orbyfied.hscsms.core.resource.event.ResourceCreateEvent;
+import net.orbyfied.hscsms.core.resource.event.ResourceHandleAcquireEvent;
+import net.orbyfied.hscsms.core.resource.event.ResourceHandleReleaseEvent;
+import net.orbyfied.hscsms.core.resource.event.ResourceUnloadEvent;
 import net.orbyfied.hscsms.db.Database;
 import net.orbyfied.hscsms.db.DatabaseItem;
 import net.orbyfied.hscsms.db.DatabaseType;
@@ -14,6 +19,8 @@ import net.orbyfied.hscsms.db.impl.MongoDatabaseItem;
 import net.orbyfied.hscsms.server.Server;
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.hscsms.util.Values;
+import net.orbyfied.j8.event.ComplexEventBus;
+import net.orbyfied.j8.event.util.Pipelines;
 import net.orbyfied.j8.registry.Identifier;
 import net.orbyfied.j8.util.logging.Logger;
 import net.orbyfied.j8.util.reflect.Reflector;
@@ -21,11 +28,9 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
 
 @SuppressWarnings("rawtypes")
 public class ServerResourceManager {
@@ -52,7 +57,17 @@ public class ServerResourceManager {
     ///////////////////////////////////////////////////////////
 
     public ServerResourceManager(Server server) {
+        // set fields
         this.server = server;
+
+        // configure event bus
+        eventBus.withDefaultPipelineFactory((bus, eventClass) -> Pipelines.mono(bus));
+
+        eventBus.bake(ResourceCreateEvent.class);
+        eventBus.bake(ResourceUnloadEvent.class);
+        eventBus.bake(ResourceHandleAcquireEvent.class);
+
+        // create global query pool
         globalQueryPool = server.databaseManager().queryPool();
     }
 
@@ -74,10 +89,56 @@ public class ServerResourceManager {
     // the thread local query pools
     private final ThreadLocal<QueryPool> queryPool = new ThreadLocal<>();
 
+    // services
+    protected final ComplexEventBus eventBus = new ComplexEventBus();
+    protected final List<ResourceService>                                      services = new ArrayList<>();
+    protected final Object2ObjectOpenHashMap<Class<?>, ResourceService> servicesByClass = new Object2ObjectOpenHashMap<>();
+
     public void setup() {
         // load query pool presets
         loadQueryPoolPresets(globalQueryPool);
     }
+
+    /* ----- Services ----- */
+
+    public ComplexEventBus getEventBus() {
+        return eventBus;
+    }
+
+    public ServerResourceManager withService(ResourceService service) {
+        services.add(service);
+        servicesByClass.put(service.getClass(), service);
+        return this;
+    }
+
+    public <S extends ResourceService> ServerResourceManager withService(Function<ServerResourceManager, S> constructor,
+                                                                         BiConsumer<ServerResourceManager, S> consumer) {
+        S service = constructor.apply(this);
+        if (consumer != null)
+            consumer.accept(this, service);
+        return withService(service);
+    }
+
+    public <S extends ResourceService> ServerResourceManager withService(Function<ServerResourceManager, S> constructor) {
+        return withService(constructor, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <S extends ResourceService> S serviceByClass(Class<S> sClass) {
+        return (S) servicesByClass.get(sClass);
+    }
+
+    public ServerResourceManager withoutService(ResourceService service) {
+        services.remove(service);
+        servicesByClass.remove(service.getClass(), service);
+        return this;
+    }
+
+    public ServerResourceManager withoutService(Class<? extends ResourceService> klass) {
+        return withoutService(serviceByClass(klass));
+    }
+
+    /* ----- Databases ----- */
 
     public ServerResourceManager database(Database database) {
         this.database = database;
@@ -114,7 +175,7 @@ public class ServerResourceManager {
         return q;
     }
 
-    /* ---- Type ---- */
+    /* ---- Resource Types ---- */
 
     public ServerResourceManager registerType(ServerResourceType type) {
         types.add(type);
@@ -177,12 +238,6 @@ public class ServerResourceManager {
     public <R extends ServerResource> R getLoadedUniversal(UUID uuid) {
         return (R) resourcesByUUID.get(uuid);
     }
-
-    public <R extends ServerResource> ServerResourceHandle<R> createHandleUniversal(UUID uuid) {
-        return new ServerResourceHandle<>(this, uuid);
-    }
-
-    /* ---- Functional ---- */
 
     /**
      * Creates a new universal unique ID
@@ -337,6 +392,9 @@ public class ServerResourceManager {
         // remove resource
         removeLoaded(resource);
 
+        // call unloaded
+        eventBus.post(new ResourceUnloadEvent(this, resource));
+
         // return
         return this;
     }
@@ -424,7 +482,28 @@ public class ServerResourceManager {
         return item;
     }
 
-    /* ---- Database ---- */
+    /* ---- Resource Handles ---- */
+
+    @SuppressWarnings("unchecked")
+    public <R extends ServerResource> ServerResourceHandle<R> createHandleUniversal(UUID uuid) {
+        return (ServerResourceHandle<R>) new ServerResourceHandle<>(this, uuid).acquire();
+    }
+
+    public <R extends ServerResource> ServerResourceHandle<R> createHandleLoaded(R resource) {
+        return new ServerResourceHandle<>(this, resource).acquire();
+    }
+
+    protected void doHandleAcquire(ServerResourceHandle handle) {
+        // call event
+        eventBus.post(new ResourceHandleAcquireEvent(this, handle));
+    }
+
+    protected void doHandleRelease(ServerResourceHandle handle) {
+        // call event
+        eventBus.post(new ResourceHandleReleaseEvent(this, handle));
+    }
+
+    /* ---- Database Utilities ---- */
 
     public boolean isDatabaseOpen() {
         return database != null && database.isOpen();
@@ -456,8 +535,8 @@ public class ServerResourceManager {
     private Bson mongoToFilterEq(Values values) {
         Bson[] bsons = new Bson[values.getSize()];
         int i = 0;
-        for (Map.Entry<String, Object> entry : values.entrySet()) {
-            bsons[i++] = Filters.eq(entry.getKey(), entry.getValue());
+        for (Map.Entry<Object, Object> entry : values.entrySet()) {
+            bsons[i++] = Filters.eq((String)entry.getKey(), entry.getValue());
         }
         return Filters.and(bsons);
     }

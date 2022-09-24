@@ -1,10 +1,9 @@
 package net.orbyfied.hscsms.util;
 
-import com.sun.jdi.Value;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 
+import java.lang.reflect.Method;
 import java.util.*;
-import java.util.function.Function;
 
 /**
  * General purpose key-value instance.
@@ -47,7 +46,7 @@ public class Values {
         ofVarargs(this, objs);
     }
 
-    public Values(Object2ObjectOpenHashMap<String, Object> map) {
+    public Values(Object2ObjectOpenHashMap<Object, Object> map) {
         this.map = map;
     }
 
@@ -57,13 +56,13 @@ public class Values {
     }
 
     // the internal map
-    Object2ObjectOpenHashMap<String, Object> map;
+    Object2ObjectOpenHashMap<Object, Object> map;
 
     public int getSize() {
         return map.size();
     }
 
-    public Object2ObjectOpenHashMap<String, Object> getMap() {
+    public Object2ObjectOpenHashMap<Object, Object> getMap() {
         return map;
     }
 
@@ -78,19 +77,19 @@ public class Values {
         return this;
     }
 
-    public Set<Map.Entry<String, Object>> entrySet() {
+    public Set<Map.Entry<Object, Object>> entrySet() {
         return map.entrySet();
     }
 
-    public List<Map.Entry<String, Object>> entries() {
+    public List<Map.Entry<Object, Object>> entries() {
         return new ArrayList<>(map.entrySet());
     }
 
-    public Set<String> keySet() {
+    public Set<Object> keySet() {
         return map.keySet();
     }
 
-    public List<String> keys() {
+    public List<Object> keys() {
         return new ArrayList<>(map.keySet());
     }
 
@@ -102,7 +101,7 @@ public class Values {
         return new ArrayList<>(map.values());
     }
 
-    public Values setRaw(String key, Object val) {
+    public Values setRaw(Object key, Object val) {
         if (val == this)
             throw new IllegalArgumentException("cannot put this recursively, attempted under key '" + key + "'");
         this.map.put(key, val);
@@ -128,7 +127,7 @@ public class Values {
     }
 
     public Values put(String key, Object val) {
-        return set(key, val);
+        return setRaw(key, val);
     }
 
     @SuppressWarnings("unchecked")
@@ -165,20 +164,27 @@ public class Values {
     }
 
     @SuppressWarnings("unchecked")
-    public <V> V getRaw(String key) {
+    public <V> V getRaw(Object key) {
         return (V) map.get(key);
     }
 
-    public <V> V getRaw(String key, Class<V> vClass) {
+    public <V> V getRaw(Object key, Class<V> vClass) {
         return getRaw(key);
     }
 
-    public boolean contains(String key) {
+    public boolean contains(Object key) {
         return map.containsKey(key);
     }
 
     public boolean containsValue(Object val) {
         return map.containsValue(val);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <V> V getOrDefaultRaw(Object key, V def) {
+        if (!map.containsKey(key))
+            return def;
+        return (V) map.get(key);
     }
 
     @SuppressWarnings("unchecked")
@@ -274,11 +280,12 @@ public class Values {
     public String toString() {
         StringBuilder b = new StringBuilder("{ ");
         int i = 0;
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
+        for (Map.Entry<Object, Object> entry : map.entrySet()) {
             // handle trailing comma
             if (i != 0)
                 b.append(", ");
-            b.append("'" + entry.getKey() + "': ");
+            b.append(Strings.toStringPretty(entry.getKey()));
+            b.append(" : ");
             b.append(Strings.toStringPretty(entry.getValue()));
 
             i++;
@@ -286,4 +293,5 @@ public class Values {
 
         return b.append(" }").toString();
     }
+
 }

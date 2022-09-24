@@ -13,7 +13,8 @@ import java.util.Base64;
 
 /**
  * General utility encryption handler, replacement
- * for {@link LegacyEncryptionProfile}
+ * for the old LegacyEncryptionProfile, which was
+ * horribly coded.
  */
 @SuppressWarnings("rawtypes")
 public abstract class EncryptionProfile<S extends EncryptionProfile> {

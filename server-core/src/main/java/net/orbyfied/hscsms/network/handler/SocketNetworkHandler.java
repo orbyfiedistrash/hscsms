@@ -5,13 +5,13 @@ import net.orbyfied.hscsms.network.NetworkManager;
 import net.orbyfied.hscsms.network.Packet;
 import net.orbyfied.hscsms.network.PacketType;
 import net.orbyfied.hscsms.security.EncryptionProfile;
-import net.orbyfied.hscsms.security.LegacyEncryptionProfile;
 import net.orbyfied.hscsms.service.Logging;
 
-import javax.crypto.Cipher;
 import java.io.*;
 import java.net.Socket;
-import java.util.Arrays;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 /**
@@ -20,6 +20,9 @@ import java.util.function.Consumer;
  */
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
+
+    // async executor service
+    Executor executor = Executors.newSingleThreadExecutor();
 
     // the socket
     Socket socket;
@@ -30,8 +33,10 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
     // disconnect handler
     Consumer<Throwable> disconnectHandler;
 
-    // decryption profile
-    EncryptionProfile decryptionProfile;
+    // decryption (and encryption) profile
+    EncryptionProfile encryptionProfile;
+    // if it should automatically write all packets encrypted
+    boolean autoEncrypt;
 
     public SocketNetworkHandler(final NetworkManager manager,
                                 final NetworkHandler parent) {
@@ -51,8 +56,13 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
         return this;
     }
 
-    public synchronized SocketNetworkHandler withDecryptionProfile(EncryptionProfile profile) {
-        this.decryptionProfile = profile;
+    public synchronized SocketNetworkHandler withEncryptionProfile(EncryptionProfile profile) {
+        this.encryptionProfile = profile;
+        return this;
+    }
+
+    public synchronized SocketNetworkHandler autoEncrypt(boolean b) {
+        this.autoEncrypt = b;
         return this;
     }
 
@@ -102,7 +112,7 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
         return this;
     }
 
-    public SocketNetworkHandler sendSync(Packet packet) {
+    public SocketNetworkHandler sendSyncRaw(Packet packet) {
         try {
             // write packet type
             outputStream.writeByte(/* unencrypted */ 0);
@@ -120,6 +130,28 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
             t.printStackTrace(Logging.ERR);
             return this;
         }
+    }
+
+    public CompletableFuture<SocketNetworkHandler> sendAsyncRaw(final Packet packet) {
+        return CompletableFuture.supplyAsync(() -> {
+            sendSyncRaw(packet);
+            return this;
+        }, executor);
+    }
+
+    public SocketNetworkHandler sendSync(Packet packet) {
+        if (autoEncrypt && encryptionProfile != null) {
+            return sendSyncEncrypted(packet, encryptionProfile);
+        }
+
+        return sendSyncRaw(packet);
+    }
+
+    public CompletableFuture<SocketNetworkHandler> sendAsync(final Packet packet) {
+        return CompletableFuture.supplyAsync(() -> {
+            sendSync(packet);
+            return this;
+        }, executor);
     }
 
     public SocketNetworkHandler sendSyncEncrypted(Packet packet, EncryptionProfile encryption) {
@@ -150,6 +182,14 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
             t.printStackTrace(Logging.ERR);
             return this;
         }
+    }
+
+    public CompletableFuture<SocketNetworkHandler> sendAsyncEncrypted(final Packet packet,
+                                                                      final EncryptionProfile profile) {
+        return CompletableFuture.supplyAsync(() -> {
+            sendSyncEncrypted(packet, profile);
+            return this;
+        }, executor);
     }
 
     public boolean isOpen() {
@@ -201,7 +241,7 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
                             stream = inputStream;
                         } else {
                             // check for decryption profile
-                            if (decryptionProfile == null) {
+                            if (encryptionProfile == null) {
                                 throw new IllegalArgumentException("can not decrypt encrypted packet, no decryption profile set");
                             }
 
@@ -211,7 +251,7 @@ public class SocketNetworkHandler extends NetworkHandler<SocketNetworkHandler> {
 
                             // create encrypted input stream
                             ByteArrayInputStream bais = new ByteArrayInputStream(encrypted);
-                            stream = decryptionProfile.decryptingInputStream(bais).toDataStream();
+                            stream = encryptionProfile.decryptingInputStream(bais).toDataStream();
                         }
 
                         // deserialize

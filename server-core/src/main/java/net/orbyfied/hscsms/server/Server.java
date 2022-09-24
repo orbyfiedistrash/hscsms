@@ -11,9 +11,8 @@ import net.orbyfied.hscsms.db.impl.MongoDatabase;
 import net.orbyfied.hscsms.network.NetworkManager;
 import net.orbyfied.hscsms.network.handler.UtilityNetworkHandler;
 import net.orbyfied.hscsms.security.AsymmetricEncryptionProfile;
-import net.orbyfied.hscsms.security.LegacyEncryptionProfile;
 import net.orbyfied.hscsms.service.Logging;
-import net.orbyfied.hscsms.util.SafeWorker;
+import net.orbyfied.hscsms.util.worker.SafeWorker;
 import net.orbyfied.hscsms.util.Values;
 import net.orbyfied.j8.util.logging.Logger;
 

@@ -1,5 +1,6 @@
 package net.orbyfied.hscsms.core.resource;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.orbyfied.hscsms.db.Database;
 import net.orbyfied.hscsms.db.DatabaseItem;
 import net.orbyfied.hscsms.db.QueryPool;
@@ -14,6 +15,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InaccessibleObjectException;
 import java.util.Random;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 
 public abstract class ServerResourceType<R extends ServerResource> {
 
@@ -70,8 +72,11 @@ public abstract class ServerResourceType<R extends ServerResource> {
 
     // the runtime resource type
     Class<R> resourceClass;
-    // the
+    // the resource instance constructor
     Constructor<R> constructor;
+
+    // the miscellaneous type properties
+    final Values props = new Values();
 
     public ServerResourceType(Identifier id,
                               Class<R> resourceClass) {
@@ -110,6 +115,15 @@ public abstract class ServerResourceType<R extends ServerResource> {
 
     public Class<R> getResourceClass() {
         return resourceClass;
+    }
+
+    public Values properties() {
+        return props;
+    }
+
+    public ServerResourceType<R> properties(BiConsumer<ServerResourceType<R>, Values> consumer) {
+        consumer.accept(this, props);
+        return this;
     }
 
     /* -------- Functional --------- */

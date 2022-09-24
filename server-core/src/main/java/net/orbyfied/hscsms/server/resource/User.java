@@ -69,6 +69,11 @@ public class User extends ServerResource {
         return this;
     }
 
+    public User setUsername(String username) {
+        this.username = username;
+        return this;
+    }
+
     public User setPasswordLocal(String name) {
         // hash password
         this.passwordHash = SHA256.digest(name.getBytes(StandardCharsets.UTF_8));

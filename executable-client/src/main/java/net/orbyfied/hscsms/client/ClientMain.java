@@ -16,7 +16,6 @@ import net.orbyfied.hscsms.network.handler.HandlerNode;
 import net.orbyfied.hscsms.network.handler.NodeAction;
 import net.orbyfied.hscsms.network.handler.SocketNetworkHandler;
 import net.orbyfied.hscsms.security.AsymmetricEncryptionProfile;
-import net.orbyfied.hscsms.security.LegacyEncryptionProfile;
 import net.orbyfied.hscsms.security.SymmetricEncryptionProfile;
 import net.orbyfied.hscsms.server.ServerClient;
 import net.orbyfied.hscsms.service.Logging;
@@ -85,7 +84,7 @@ public class ClientMain {
                 .<PacketClientboundPublicKey>withHandler((handler, node1, packet) -> {
                     // set public key
                     serverEncryptionProfile.withPublicKey(packet.getKey());
-                    networkHandler.withDecryptionProfile(serverEncryptionProfile);
+                    networkHandler.withEncryptionProfile(serverEncryptionProfile);
 
                     // generate private key
                     clientEncryptionProfile.generateKeys();
@@ -97,7 +96,9 @@ public class ClientMain {
                     );
 
                     // use new decryption profile
-                    networkHandler.withDecryptionProfile(clientEncryptionProfile);
+                    networkHandler
+                            .withEncryptionProfile(clientEncryptionProfile)
+                            .autoEncrypt(true);
 
                     // return and remove this node
                     return new HandlerNode.Result(ChainAction.CONTINUE)
@@ -110,8 +111,7 @@ public class ClientMain {
                     String message = packet.message + "-modified";
 
                     // send new packet
-                    networkHandler.sendSyncEncrypted(new PacketUnboundHandshakeOk(message),
-                            clientEncryptionProfile);
+                    networkHandler.sendSync(new PacketUnboundHandshakeOk(message));
 
                     // return and remove this node
                     return new HandlerNode.Result(ChainAction.CONTINUE)

@@ -6,12 +6,12 @@ import net.orbyfied.hscsms.common.protocol.handshake.PacketClientboundPublicKey;
 import net.orbyfied.hscsms.common.protocol.PacketServerboundDisconnect;
 import net.orbyfied.hscsms.common.protocol.handshake.PacketServerboundClientKey;
 import net.orbyfied.hscsms.common.protocol.handshake.PacketUnboundHandshakeOk;
+import net.orbyfied.hscsms.common.protocol.login.PacketServerboundCreateUser;
 import net.orbyfied.hscsms.network.handler.ChainAction;
 import net.orbyfied.hscsms.network.handler.HandlerNode;
 import net.orbyfied.hscsms.network.handler.NodeAction;
 import net.orbyfied.hscsms.network.handler.SocketNetworkHandler;
 import net.orbyfied.hscsms.common.protocol.DisconnectReason;
-import net.orbyfied.hscsms.security.LegacyEncryptionProfile;
 import net.orbyfied.hscsms.security.SymmetricEncryptionProfile;
 import net.orbyfied.hscsms.server.resource.User;
 import net.orbyfied.hscsms.service.Logging;
@@ -25,6 +25,7 @@ import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class ServerClient {
@@ -151,14 +152,16 @@ public class ServerClient {
         AtomicReference<String> okMessage = new AtomicReference<>();
 
         // initialize decryption before client encryption
-        networkHandler.withDecryptionProfile(server.topLevelEncryption);
+        networkHandler.withEncryptionProfile(server.topLevelEncryption);
 
         // add handshake handler to client
         networkHandler.node().childForType(PacketServerboundClientKey.TYPE)
                 .<PacketServerboundClientKey>withHandler((handler, node, packet) -> {
                     // store key
                     clientEncryptionProfile.withKey("secret", packet.getKey());
-                    networkHandler.withDecryptionProfile(clientEncryptionProfile);
+                    networkHandler
+                            .withEncryptionProfile(clientEncryptionProfile)
+                            .autoEncrypt(true);
 
                     // generate message and send ok packet
                     Random random = new Random();
@@ -167,7 +170,7 @@ public class ServerClient {
                         bytes[i] = (byte)(random.nextInt(120) + 30);
                     okMessage.set(Base64.getEncoder().encodeToString(bytes));
 
-                    networkHandler.sendSyncEncrypted(new PacketUnboundHandshakeOk(okMessage.get()), clientEncryptionProfile);
+                    networkHandler.sendSync(new PacketUnboundHandshakeOk(okMessage.get()));
 
                     return new HandlerNode.Result(ChainAction.CONTINUE)
                             .nodeAction(NodeAction.REMOVE);
@@ -177,10 +180,10 @@ public class ServerClient {
         networkHandler.node().childForType(PacketUnboundHandshakeOk.TYPE)
                 .<PacketUnboundHandshakeOk>withHandler((handler, node, packet) -> {
                     if (!(okMessage.get() + "-modified").equals(packet.message)) {
-                        LOGGER.err("RSA encrypted handshake verification failed for {0}", this);
+                        LOGGER.err("AES encrypted handshake verification failed for {0}", this);
                         disconnect(DisconnectReason.KICK);
                     } else {
-                        LOGGER.ok("Verified RSA encrypted handshake for {0}", this);
+                        LOGGER.ok("Verified AES encrypted handshake for {0}", this);
                     }
 
                     // finish encryption
@@ -200,28 +203,70 @@ public class ServerClient {
     // called when a secure, encrypted
     // connection has been established
     protected void onEncryptionReady() {
-        // allow login to a user now
-        authenticateAndLogin("orbyfied", "hhr3");
+        onEnterLoginState();
+    }
+
+    // called when we the client is allowed to
+    // login or create a new user
+    protected void onEnterLoginState() {
+        // allow user creation
+        networkHandler.node().childForType(PacketServerboundCreateUser.TYPE)
+                .<PacketServerboundCreateUser>withHandler((handler, node, packet) -> {
+                    // create new user
+                    UserCreateResult result = createUser(packet.getUsername(), packet.getPassword());
+
+                    // check result
+                    if (result.success) {
+                        //
+                    } else {
+
+                    }
+
+                    // return
+                    return new HandlerNode.Result(ChainAction.CONTINUE).nodeAction(NodeAction.REMOVE);
+                });
     }
 
     /* ---------- User ----------- */
 
-    protected record AuthenticationResult(User user, boolean success, Object t) {
-        public static AuthenticationResult ofSuccess(User user) {
-            return new AuthenticationResult(user, true, null);
-        }
+    public record UserAuthenticationResult(User user, boolean success, Object t) {
+        public static UserAuthenticationResult ofSuccess(User user) { return new UserAuthenticationResult(user, true, null); }
+        public static UserAuthenticationResult failPreFind(Object t) { return new UserAuthenticationResult(null, false, t); }
+        public static UserAuthenticationResult failPostFind(User user, Object t) { return new UserAuthenticationResult(user, false, t); }
+    }
 
-        public static AuthenticationResult failPreFind(Object t) {
-            return new AuthenticationResult(null, false, t);
-        }
+    public record UserCreateResult(UUID uuid, boolean success, Object t) {
+        public static UserCreateResult ofSuccess(UUID uuid) { return new UserCreateResult(uuid, true, null); }
+        public static UserCreateResult fail(Object t) { return new UserCreateResult(null, false, t); }
+    }
 
-        public static AuthenticationResult failPostFind(User user, Object t) {
-            return new AuthenticationResult(user, false, t);
+    protected boolean checkUserName(String username) {
+        return true; // TODO
+    }
+
+    protected UserCreateResult createUser(String username,
+                              String password) {
+        try {
+            // check credentials
+            if (!checkUserName(username))
+                return UserCreateResult.fail("invalid_username");
+
+            // create user resource
+            User user = server.resourceManager().createResource(User.TYPE);
+            user.setUsername(username);
+            user.setPasswordLocal(password);
+
+            // log and return success
+            LOGGER.info("{0} created user " + user.universalID() + "('" + username + "')");
+            return UserCreateResult.ofSuccess(user.universalID());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return UserCreateResult.fail(e);
         }
     }
 
-    protected AuthenticationResult authenticateAndLogin(String username,
-                                                        String password) {
+    protected UserAuthenticationResult authenticateAndLogin(String username,
+                                                            String password) {
         // find user by username
         User user = server.resourceManager
                 .loadDatabaseResourceFiltered(User.TYPE, new Values()
@@ -229,7 +274,7 @@ public class ServerClient {
 
         // check if we found a user
         if (user == null) {
-            return AuthenticationResult.failPreFind("unknown_user");
+            return UserAuthenticationResult.failPreFind("unknown_user");
         }
 
         try {
@@ -240,13 +285,13 @@ public class ServerClient {
             // compare
             boolean pwMatches = Arrays.equals(digestedProvidedPassword, user.getPasswordHash());
             if (!pwMatches) {
-                return AuthenticationResult
+                return UserAuthenticationResult
                         .failPostFind(user, "invalid_password");
             }
         } catch (Exception e) {
             LOGGER.err("Error while checking login of client {0} to user {1}", this, user.localID());
             e.printStackTrace();
-            return AuthenticationResult.failPostFind(user, e);
+            return UserAuthenticationResult.failPostFind(user, e);
         }
 
         // log in client
@@ -254,7 +299,7 @@ public class ServerClient {
         this.user.login(this);
 
         // return success
-        return AuthenticationResult.ofSuccess(user);
+        return UserAuthenticationResult.ofSuccess(user);
     }
 
     protected void logOut() {

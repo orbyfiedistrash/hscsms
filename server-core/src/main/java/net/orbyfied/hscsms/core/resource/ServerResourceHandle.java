@@ -3,8 +3,6 @@ package net.orbyfied.hscsms.core.resource;
 import java.lang.ref.WeakReference;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ServerResourceHandle<R extends ServerResource> {
 
@@ -20,6 +18,12 @@ public class ServerResourceHandle<R extends ServerResource> {
     public ServerResourceHandle(ServerResourceManager manager, UUID uuid) {
         this.manager = manager;
         this.uuid    = uuid;
+    }
+
+    public ServerResourceHandle(ServerResourceManager manager, R resource) {
+        this.manager  = manager;
+        this.uuid     = resource.universalID();
+        this.resource = new WeakReference<>(resource);
     }
 
     /* Getters */
@@ -92,6 +96,49 @@ public class ServerResourceHandle<R extends ServerResource> {
         CompletableFuture<R> future = new CompletableFuture<>();
         future.complete(resource.get());
         return future;
+    }
+
+    /**
+     * @see ServerResourceHandle#acquire()
+     * @see ServerResourceHandle#getOrNull()
+     * @return The loaded resource or null.
+     */
+    public R acquireAndGet() {
+        return acquire().getOrNull();
+    }
+
+    /**
+     * Marks this resource as used so it is,
+     * for example, not collected by the garbage
+     * collector. This allows you to use it without
+     * it being unloaded. It is set in this state by
+     * default by the resource manager.
+     * @return This.
+     */
+    public ServerResourceHandle<R> acquire() {
+        // call into manager
+        manager.doHandleAcquire(this);
+
+        // return
+        return this;
+    }
+
+    /**
+     * Marks this resource as unused, so it
+     * can be, for example, unloaded by the
+     * garbage collector. When you dispose
+     * the handle you're essentially saying
+     * you won't need it anymore, though
+     * nothing prevents you from using it
+     * after disposal until it is unloaded.
+     * @return This.
+     */
+    public ServerResourceHandle<R> release() {
+        // call into manager
+        manager.doHandleRelease(this);
+
+        // return
+        return this;
     }
 
 }

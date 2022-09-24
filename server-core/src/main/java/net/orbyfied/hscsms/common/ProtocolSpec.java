@@ -7,7 +7,6 @@ import net.orbyfied.hscsms.common.protocol.handshake.PacketServerboundClientKey;
 import net.orbyfied.hscsms.common.protocol.handshake.PacketUnboundHandshakeOk;
 import net.orbyfied.hscsms.network.NetworkManager;
 import net.orbyfied.hscsms.security.AsymmetricEncryptionProfile;
-import net.orbyfied.hscsms.security.LegacyEncryptionProfile;
 import net.orbyfied.hscsms.security.SymmetricEncryptionProfile;
 
 public class ProtocolSpec {

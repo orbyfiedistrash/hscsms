@@ -1,6 +1,5 @@
-package net.orbyfied.hscsms.util;
+package net.orbyfied.hscsms.util.worker;
 
-import net.orbyfied.hscsms.network.Packet;
 import net.orbyfied.hscsms.service.Logging;
 
 import java.util.function.Consumer;

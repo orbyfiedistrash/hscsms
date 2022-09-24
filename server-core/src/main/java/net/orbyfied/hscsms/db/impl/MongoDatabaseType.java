@@ -24,7 +24,7 @@ public class MongoDatabaseType extends DatabaseType<MongoDatabase> {
 
         // set mongo logging level
         java.util.logging.Logger logger = java.util.logging.Logger.getLogger("org.mongodb.driver");
-        logger.setLevel(Level.SEVERE);
+        logger.setLevel(Level.OFF);
     }
 
     @Override

@@ -1,4 +1,4 @@
-package net.orbyfied.hscsms.util;
+package net.orbyfied.hscsms.util.worker;
 
 import net.orbyfied.hscsms.service.Logging;
 import net.orbyfied.j8.util.functional.ThrowableRunnable;
